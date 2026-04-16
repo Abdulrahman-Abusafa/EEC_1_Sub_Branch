@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Search, Menu, X } from "lucide-react";
+import { Zap, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -16,24 +16,16 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-4xl glass-panel bg-white/70 dark:bg-white/[0.02] rounded-full px-6 py-3 flex items-center justify-between shadow-lg dark:shadow-[0_0_20px_rgba(6,182,212,0.1)]">
+      <nav className="fixed top-6 inset-x-0 mx-auto z-50 w-[90%] max-w-4xl h-16 md:h-20 glass-panel bg-white/70 dark:bg-white/[0.02] rounded-full px-6 flex items-center justify-between shadow-lg dark:shadow-[0_0_20px_rgba(6,182,212,0.1)]">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="flex items-center justify-center">
+        <Link href="/" className="relative flex items-center h-full w-28 md:w-40 shrink-0 group">
+          <div className="absolute top-1/2 -translate-y-1/2 -left-4 md:-left-8 pointer-events-none h-32 w-48 md:h-48 md:w-72">
             <img 
-              src="/logo.svg" 
+              src="/logo_white.PNG" 
               alt="EEC Logo" 
-              className="w-10 h-10 object-contain block dark:hidden" 
-            />
-            <img 
-              src="/logo_white.svg" 
-              alt="EEC Logo White" 
-              className="w-10 h-10 object-contain hidden dark:block" 
+              className="absolute inset-0 w-full h-full object-contain transition-all duration-500 invert dark:invert-0 drop-shadow-xl" 
             />
           </div>
-          <span className="font-[family-name:var(--font-orbitron)] font-bold tracking-wider text-gray-900 dark:text-white">
-            EEC
-          </span>
         </Link>
 
         {/* Desktop Links */}
@@ -48,9 +40,6 @@ export default function Navbar() {
         {/* Actions */}
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          <button className="p-2 hover:bg-black/10 dark:bg-white/10 rounded-full transition-colors text-gray-800 dark:text-white/80 hover:text-gray-900 dark:text-white hover:text-neon-blue">
-            <Search className="w-5 h-5" />
-          </button>
           <button
             className="md:hidden p-2 text-gray-800 dark:text-white/80 hover:text-gray-900 dark:text-white"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -71,7 +60,7 @@ export default function Navbar() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 z-40 bg-white/95 dark:bg-deep-space/95 backdrop-blur-3xl pt-24 px-6 md:hidden"
+            className="fixed inset-0 z-40 bg-white/95 dark:bg-deep-space/95 backdrop-blur-3xl px-6 md:hidden flex flex-col items-center justify-center"
           >
             <div className="flex flex-col gap-6 items-center">
               <MobileNavLink

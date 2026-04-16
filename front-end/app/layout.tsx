@@ -33,8 +33,8 @@ export const metadata: Metadata = {
       },
       {
         media: "(prefers-color-scheme: dark)",
-        url: "/logo_white.svg",
-        href: "/logo_white.svg",
+        url: "/logo_white.PNG",
+        href: "/logo_white.PNG",
       },
     ],
   },
@@ -50,7 +50,7 @@ export default function RootLayout({
       <body
         className={`${orbitron.variable} ${inter.variable} antialiased bg-gray-50 dark:bg-deep-space text-gray-900 dark:text-white overflow-x-hidden`}
       >
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <div className="fixed inset-0 z-[-1] pointer-events-none">
              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-neon-blue/5 via-deep-space to-deep-space opacity-40"></div>
           </div>

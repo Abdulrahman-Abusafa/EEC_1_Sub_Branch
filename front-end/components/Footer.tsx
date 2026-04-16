@@ -16,21 +16,14 @@ export default function Footer() {
           {/* Brand */}
           <div className="flex flex-col gap-4 max-w-sm">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="flex items-center justify-center">
+              <div className="grid items-center justify-center">
                 <img 
-                  src="/logo.svg" 
+                  src="/logo_white.PNG" 
                   alt="EEC Logo" 
-                  className="w-10 h-10 object-contain block dark:hidden" 
-                />
-                <img 
-                  src="/logo_white.svg" 
-                  alt="EEC Logo White" 
-                  className="w-10 h-10 object-contain hidden dark:block" 
+                  className="h-32 md:h-48 w-auto object-contain col-start-1 row-start-1 transition-all duration-300 invert dark:invert-0" 
                 />
               </div>
-              <span className="font-[family-name:var(--font-orbitron)] font-bold tracking-wider text-gray-900 dark:text-white text-xl">
-                EEC
-              </span>
+
             </Link>
             <p className="text-gray-600 dark:text-white/60 text-sm">
               Empowering the next generation of electrical engineers with resources, community, and innovation.

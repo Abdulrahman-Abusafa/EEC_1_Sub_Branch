@@ -59,7 +59,7 @@ export default function Home() {
         
         {/* Text Content */}
         <div className="flex flex-col gap-6 items-center lg:items-start max-w-2xl z-10">
-            <h1 className="text-5xl md:text-7xl font-bold font-[family-name:var(--font-orbitron)] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-400 dark:from-white dark:to-white/40">
+            <h1 className="text-5xl md:text-7xl font-bold font-[family-name:var(--font-orbitron)] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-400 dark:from-white dark:to-white/40 pb-4">
                 The Future of <br /> Engineering.
             </h1>
 
@@ -69,8 +69,8 @@ export default function Home() {
 
             <div className="flex gap-6 mt-4">
                 <Link href="/academics">
-                    <button className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-black rounded-full font-medium hover:bg-gray-800 dark:hover:bg-white/90 transition-all flex items-center gap-2 shadow-[0_0_30px_rgba(0,0,0,0.1)] dark:shadow-[0_0_30px_rgba(255,255,255,0.1)] cursor-pointer">
-                        Enter Dashboard <ArrowRight className="w-4 h-4" />
+                    <button className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-black border border-transparent hover:border-gray-900 dark:hover:border-white hover:bg-white dark:hover:bg-black hover:text-gray-900 dark:hover:text-white rounded-full font-medium transition-all flex items-center gap-2 shadow-[0_0_30px_rgba(0,0,0,0.1)] dark:shadow-[0_0_30px_rgba(255,255,255,0.1)] cursor-pointer group">
+                        Enter Dashboard <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </button>
                 </Link>
             </div>
@@ -84,7 +84,7 @@ export default function Home() {
                 rotateY,
                 transformStyle: "preserve-3d"
             }}
-            initial={{ scale: 0.8, opacity: 0, x: 50 }}
+            initial={false}
             animate={{ scale: 1, opacity: 1, x: 0 }}
             transition={{ duration: 1.5, ease: "easeOut" }}
             className="relative w-64 h-64 md:w-96 md:h-96 flex items-center justify-center"
@@ -136,6 +136,7 @@ export default function Home() {
             <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
                         <motion.div 
                 className="flex gap-6 w-max"
+                initial={false}
                 animate={{ x: [0, -1000] }}
                 transition={{ repeat: Infinity, ease: "linear", duration: 25 }}
             >
@@ -195,28 +196,7 @@ export default function Home() {
       </section>
 
       {/* Quick Access - 3D Tilt Cards */}
-      <section className="w-full">
-         <div className="flex items-center justify-between mb-12">
-            <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)] text-gray-800 dark:text-white/80">
-                Active Modules
-            </h2>
-            <div className="h-px bg-black/10 dark:bg-white/10 flex-grow ml-6" />
-         </div>
-         
-         <div className="flex justify-center w-full mt-10">
-             <TiltCard className="w-full max-w-md">
-                 <div className="flex flex-col items-center text-center gap-4 py-8">
-                     <div className="w-16 h-16 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center border border-black/10 dark:border-white/10">
-                         <div className="text-3xl animate-pulse">⚙️</div>
-                     </div>
-                     <div>
-                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Coming Soon</h3>
-                         <p className="text-gray-500 dark:text-white/50 text-base mt-2">Active modules will be available here shortly.</p>
-                     </div>
-                 </div>
-             </TiltCard>
-         </div>
-      </section>
+      
     </div>
   );
 }
