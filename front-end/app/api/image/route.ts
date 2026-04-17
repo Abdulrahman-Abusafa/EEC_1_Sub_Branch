@@ -7,10 +7,11 @@ export async function GET(request: NextRequest) {
         return new NextResponse("Missing token", { status: 400 });
     }
 
-    const upstream = `https://table.inmakan.com/api/attachments/read/private/table/${token}`;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+    const upstream = `${apiBase}/image?token=${encodeURIComponent(token)}`;
 
     try {
-        const res = await fetch(upstream, { cache: "force-cache" });
+        const res = await fetch(upstream, { cache: "no-store" });
 
         if (!res.ok) {
             return new NextResponse("Failed to fetch image", { status: res.status });

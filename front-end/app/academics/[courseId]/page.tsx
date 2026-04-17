@@ -21,9 +21,13 @@ type CourseMeta = {
     prerequisites: string[];
     objectives: string[];
     resources: {
-        lectures: { title: string; href: string }[];
-        exams: { title: string; href: string }[];
-        materials: { title: string; href: string }[];
+        videos: { title: string; href: string }[];
+        booksAndNotes: { title: string; href: string }[];
+        oldExams: {
+            major1: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
+            major2: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
+            final: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
+        };
         other: { title: string; href: string }[];
     };
     exams: {
@@ -38,28 +42,54 @@ type ExamDates = { major1: Date; major2: Date; final: Date };
 
 function parseDates(course: Course): ExamDates {
     return {
-        major1: new Date(course.major_1_date),
-        major2: new Date(course.major_2_date),
-        final: new Date(course.final_date),
+        major1: course.major_1_date ? new Date(course.major_1_date) : new Date(),
+        major2: course.major_2_date ? new Date(course.major_2_date) : new Date(),
+        final: course.final_date ? new Date(course.final_date) : new Date(),
     };
 }
 
 function groupResources(resources: Resource[]) {
-    const lectures: { title: string; href: string }[] = [];
-    const exams: { title: string; href: string }[] = [];
-    const materials: { title: string; href: string }[] = [];
+    const videos: { title: string; href: string }[] = [];
+    const booksAndNotes: { title: string; href: string }[] = [];
+    const oldExams: {
+        major1: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
+        major2: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
+        final: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
+    } = { major1: {}, major2: {}, final: {} };
     const other: { title: string; href: string }[] = [];
 
     resources.forEach(r => {
         const item = { title: r.resource_title, href: r.url };
         const cat = r.category?.toLowerCase();
-        if (cat === "lecture") lectures.push(item);
-        else if (cat === "exam") exams.push(item);
-        else if (cat === "material") materials.push(item);
-        else other.push(item);
+        const subCat = r.sub_category?.toLowerCase();
+
+        if (subCat === 'videos' || cat === 'lecture') {
+            videos.push(item);
+        } else if (subCat === 'books & notes' || cat === 'material') {
+            booksAndNotes.push(item);
+        } else if (subCat === 'old exams' || cat === 'exam') {
+            // Determine exam type from title or sub_category
+            let examType = 'major1'; // default
+            const title = r.resource_title.toLowerCase();
+            if (title.includes('major 2') || title.includes('midterm 2')) examType = 'major2';
+            else if (title.includes('final')) examType = 'final';
+
+            const semester = r.semester || 'Unknown Semester';
+            const chapter = r.chapter || 'General';
+
+            if (!oldExams[examType as keyof typeof oldExams][semester]) {
+                oldExams[examType as keyof typeof oldExams][semester] = {};
+            }
+            if (!oldExams[examType as keyof typeof oldExams][semester][chapter]) {
+                oldExams[examType as keyof typeof oldExams][semester][chapter] = [];
+            }
+            oldExams[examType as keyof typeof oldExams][semester][chapter].push(item);
+        } else {
+            other.push(item);
+        }
     });
 
-    return { lectures, exams, materials, other };
+    return { videos, booksAndNotes, oldExams, other };
 }
 
 
@@ -176,32 +206,131 @@ function ContentSection({ title, items, icon: Icon }: { title: string, items: { 
     );
 }
 
+function VideosSection({ items }: { items: { title: string; href: string }[] }) {
+    if (!items || items.length === 0) return null;
+    return (
+        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/10 dark:border-white/20 transition-colors h-full flex flex-col">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
+                    <Play className="w-5 h-5 text-neon-blue" />
+                </div>
+                <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">Videos</h3>
+            </div>
+            <div className="flex flex-col gap-3">
+                {items.map((item, i) => (
+                    <a key={i} href={item.href} className="group p-4 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-black/10 dark:border-white/10 transition-all flex items-center justify-between">
+                        <span className="text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:text-white transition-colors text-sm">{item.title}</span>
+                        <Play className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue opacity-0 group-hover:opacity-100 transition-all" />
+                    </a>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function BooksAndNotesSection({ items }: { items: { title: string; href: string }[] }) {
+    if (!items || items.length === 0) return null;
+    return (
+        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/10 dark:border-white/20 transition-colors h-full flex flex-col">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
+                    <BookOpen className="w-5 h-5 text-neon-blue" />
+                </div>
+                <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">Books & Notes</h3>
+            </div>
+            <div className="flex flex-col gap-3">
+                {items.map((item, i) => (
+                    <a key={i} href={item.href} className="group p-4 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-black/10 dark:border-white/10 transition-all flex items-center justify-between">
+                        <span className="text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:text-white transition-colors text-sm">{item.title}</span>
+                        <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue opacity-0 group-hover:opacity-100 transition-all" />
+                    </a>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function OldExamsSection({ exams }: { exams: { major1: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } }; major2: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } }; final: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } } } }) {
+    const hasExams = Object.values(exams).some(examType => Object.keys(examType).length > 0);
+    if (!hasExams) return null;
+
+    return (
+        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/10 dark:border-white/20 transition-colors h-full flex flex-col">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
+                    <Calculator className="w-5 h-5 text-neon-blue" />
+                </div>
+                <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">Old Exams</h3>
+            </div>
+            <div className="flex flex-col gap-4">
+                {Object.entries(exams).map(([examType, semesters]) => {
+                    if (Object.keys(semesters).length === 0) return null;
+                    const examTitle = examType === 'major1' ? 'Major 1' : examType === 'major2' ? 'Major 2' : 'Final';
+                    return (
+                        <div key={examType} className="border-l-2 border-neon-blue/20 pl-4">
+                            <h4 className="text-lg font-semibold text-gray-900 dark:text-white/90 mb-2">{examTitle}</h4>
+                            {Object.entries(semesters).map(([semester, chapters]) => (
+                                <div key={semester} className="mb-3">
+                                    <h5 className="text-sm font-medium text-gray-700 dark:text-white/70 mb-1">{semester}</h5>
+                                    {Object.entries(chapters).map(([chapter, items]) => (
+                                        <div key={chapter} className="ml-4 mb-2">
+                                            <span className="text-xs text-gray-500 dark:text-white/50">{chapter}</span>
+                                            <div className="flex flex-wrap gap-2 mt-1">
+                                                {items.map((item, i) => (
+                                                    <a key={i} href={item.href} className="text-xs px-2 py-1 rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white">
+                                                        {item.title}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function ExamTimer({ exams }: { exams: CourseMeta["exams"] }) {
     const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
     const [currentExam, setCurrentExam] = useState<{ title: string; date: Date } | null>(null);
 
     useEffect(() => {
+        // Validate that exams have valid dates
+        if (!exams || !exams.major1 || !exams.major2 || !exams.final) {
+            setCurrentExam(null);
+            return;
+        }
+
         const timer = setInterval(() => {
-            const now = new Date();
-            
-            // Determine which exam is next
-            let next = null;
-            if (now < exams.major1) next = { title: "Major Exam 1", date: exams.major1 };
-            else if (now < exams.major2) next = { title: "Major Exam 2", date: exams.major2 };
-            else if (now < exams.final) next = { title: "Final Exam", date: exams.final };
+            try {
+                const now = new Date();
+                
+                // Determine which exam is next
+                let next = null;
+                if (now < exams.major1) next = { title: "Major Exam 1", date: exams.major1 };
+                else if (now < exams.major2) next = { title: "Major Exam 2", date: exams.major2 };
+                else if (now < exams.final) next = { title: "Final Exam", date: exams.final };
 
-            setCurrentExam(next);
+                setCurrentExam(next);
 
-            if (next) {
-                const difference = next.date.getTime() - now.getTime();
-                setTimeLeft({
-                    days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-                    hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-                    minutes: Math.floor((difference / 1000 / 60) % 60),
-                    seconds: Math.floor((difference / 1000) % 60),
-                });
-            } else {
-                setTimeLeft(null);
+                if (next) {
+                    const difference = next.date.getTime() - now.getTime();
+                    setTimeLeft({
+                        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+                        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+                        minutes: Math.floor((difference / 1000 / 60) % 60),
+                        seconds: Math.floor((difference / 1000) % 60),
+                    });
+                } else {
+                    setTimeLeft(null);
+                }
+            } catch (e) {
+                console.error("Error in ExamTimer:", e);
+                setCurrentExam(null);
             }
         }, 1000);
 
@@ -209,11 +338,7 @@ function ExamTimer({ exams }: { exams: CourseMeta["exams"] }) {
     }, [exams]);
 
     if (!currentExam || !timeLeft) {
-        return (
-            <div className="p-8 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 flex items-center justify-center mb-12">
-                 <p className="text-gray-500 dark:text-white/50 font-mono">No upcoming exams scheduled.</p>
-            </div>
-        );
+        return null;
     }
 
     return (
@@ -262,19 +387,49 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
   const decodedId = decodeURIComponent(courseId);
 
   const [course, setCourse] = useState<Course | null>(null);
-  const [resources, setResources] = useState<{ lectures: {title:string;href:string}[]; exams: {title:string;href:string}[]; materials: {title:string;href:string}[]; other: {title:string;href:string}[] }>({ lectures: [], exams: [], materials: [], other: [] });
+  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; booksAndNotes: {title:string;href:string}[]; oldExams: {major1:{[k:string]:{[k:string]:{title:string;href:string}[]}}; major2:{[k:string]:{[k:string]:{title:string;href:string}[]}}; final:{[k:string]:{[k:string]:{title:string;href:string}[]}}}; other: {title:string;href:string}[] }>({ videos: [], booksAndNotes: [], oldExams: {major1:{},major2:{},final:{}}, other: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-      Promise.all([
-          fetchCourses(),
-          fetchCourseResources(decodedId),
-      ]).then(([courses, rawResources]) => {
-          const found = courses.find(c => c.course_name === decodedId || c.course_name === decodedId.replace(" ", ""));
-          if (found) setCourse(found);
-          setResources(groupResources(rawResources));
-      }).finally(() => setLoading(false));
+      (async () => {
+        try {
+          const [courses, rawResources] = await Promise.all([
+              fetchCourses(),
+              fetchCourseResources(decodedId).catch((e: Error) => {
+                console.warn("Failed to fetch course resources:", e.message);
+                return [];
+              }),
+          ]);
+          
+          const found = courses.find(c => c.course_name === decodedId || c.course_name === decodedId.replace(/ /g, ""));
+          if (found) {
+            setCourse(found);
+            setResources(groupResources(rawResources));
+          } else {
+            setError(`Course "${decodedId}" not found`);
+          }
+        } catch (err) {
+          console.error("Error loading course:", err);
+          setError(`Failed to load course: ${err instanceof Error ? err.message : "Unknown error"}`);
+        } finally {
+          setLoading(false);
+        }
+      })();
   }, [decodedId]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-deep-space flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>
+          <button onClick={() => router.back()} className="px-4 py-2 bg-neon-blue text-white rounded-lg hover:bg-neon-blue/90">
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
       return (
@@ -291,8 +446,25 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
   const displayLevel = course ? `Level ${course.level}` : "";
   const displayCredits = course?.credits ?? 0;
   const displayDifficulty = course?.difficulty ?? 3;
-  const displayObjectives = course?.objectives ? course.objectives.split(",").map(s => s.trim()) : [];
-  const displayPrereqs = course?.prerequisites ? course.prerequisites.split(",").map(s => s.trim()) : [];
+  
+  // Parse objectives - handle both actual newlines and escaped newlines
+  const displayObjectives = course?.objectives 
+    ? typeof course.objectives === 'string' 
+      ? course.objectives.split(/\n|\\n/).map(s => s.trim()).filter(Boolean)
+      : Array.isArray(course.objectives)
+        ? course.objectives
+        : []
+    : [];
+  
+  // Parse prerequisites - handle comma-separated or arrays
+  const displayPrereqs = course?.prerequisites
+    ? typeof course.prerequisites === 'string'
+      ? course.prerequisites.split(/,|;/).map(s => s.trim()).filter(Boolean)
+      : Array.isArray(course.prerequisites)
+        ? course.prerequisites
+        : []
+    : [];
+  
   const displayExams = course ? parseDates(course) : { major1: new Date(), major2: new Date(), final: new Date() };
 
   // Alias to avoid conflict with outer local
@@ -360,21 +532,9 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
             <div>
                 <h2 className="text-3xl font-bold font-[family-name:var(--font-orbitron)] mb-8">Course Resources</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <ContentSection 
-                        title="Lectures & Recordings" 
-                        items={data.resources.lectures}
-                        icon={Play}
-                    />
-                    <ContentSection 
-                        title="Exams & Quizzes" 
-                        items={data.resources.exams}
-                        icon={Calculator}
-                    />
-                    <ContentSection 
-                        title="Study Materials" 
-                        items={data.resources.materials}
-                        icon={FileText}
-                    />
+                    <VideosSection items={data.resources.videos} />
+                    <BooksAndNotesSection items={data.resources.booksAndNotes} />
+                    <OldExamsSection exams={data.resources.oldExams} />
                     {data.resources.other && data.resources.other.length > 0 && (
                         <div className="md:col-span-2 lg:col-span-3">
                             <OtherResourcesSection

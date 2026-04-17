@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Zap, Github, Twitter, Linkedin, Mail } from "lucide-react";
 
 export default function Footer() {
   const pathname = usePathname();
@@ -40,7 +39,7 @@ export default function Footer() {
              <div className="flex flex-col gap-4">
                 <h3 className="font-bold text-gray-900 dark:text-white font-[family-name:var(--font-orbitron)]">Club</h3>
                 <Link href="/about" className="text-gray-700 dark:text-white/60 hover:text-neon-blue transition-colors text-sm">About Us</Link>
-                <Link href="/team" className="text-gray-700 dark:text-white/60 hover:text-neon-blue transition-colors text-sm">Team</Link>
+                <Link href="/about" className="text-gray-700 dark:text-white/60 hover:text-neon-blue transition-colors text-sm">Team</Link>
                 <Link href="/contact" className="text-gray-700 dark:text-white/60 hover:text-neon-blue transition-colors text-sm">Contact</Link>
              </div>
           </div>
@@ -49,28 +48,24 @@ export default function Footer() {
         <div className="h-px w-full bg-black/10 dark:bg-white/10" />
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <p className="text-gray-400 dark:text-white/40 text-sm">
-                © {new Date().getFullYear()} Electrical Engineering Club. All rights reserved.
-            </p>
+            <div className="flex flex-col items-center md:items-start gap-1">
+                <p className="text-gray-400 dark:text-white/40 text-sm">
+                    © {new Date().getFullYear()} Electrical Engineering Club. All rights reserved.
+                </p>
+                <p className="text-gray-400 dark:text-white/30 text-xs">
+                    Developed by <span className="text-neon-blue/70">Mazen Osama</span> &amp; <span className="text-neon-blue/70">Abdelrahman Abu Safa</span>
+                </p>
+            </div>
             <div className="flex items-center gap-4">
-                <SocialLink href="#" icon={Github} />
-                <SocialLink href="#" icon={Twitter} />
-                <SocialLink href="#" icon={Linkedin} />
-                <SocialLink href="#" icon={Mail} />
+                <a href="https://www.linkedin.com/company/eec-kfupm/posts/?feedView=all" target="_blank" rel="noreferrer" className="p-2 bg-black/5 dark:bg-white/5 rounded-full text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:bg-neon-blue/20 hover:scale-110 transition-all">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                </a>
+                <a href="https://x.com/EEC_KFUPM" target="_blank" rel="noreferrer" className="p-2 bg-black/5 dark:bg-white/5 rounded-full text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:bg-neon-blue/20 hover:scale-110 transition-all">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </a>
             </div>
         </div>
       </div>
     </footer>
   );
-}
-
-function SocialLink({ href, icon: Icon }: { href: string; icon: import("lucide-react").LucideIcon }) {
-    return (
-        <a 
-            href={href} 
-            className="p-2 bg-black/5 dark:bg-white/5 rounded-full text-gray-600 dark:text-white/60 hover:text-gray-900 dark:text-white hover:bg-neon-blue/20 hover:scale-110 transition-all"
-        >
-            <Icon className="w-5 h-5" />
-        </a>
-    )
 }

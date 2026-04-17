@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 import { Users, Calendar, BookOpen, Activity } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -15,9 +17,9 @@ export default function AdminDashboard() {
     async function fetchStats() {
       try {
         const [membersRes, eventsRes, coursesRes] = await Promise.all([
-          fetch("http://localhost:4000/members").catch(() => null),
-          fetch("http://localhost:4000/events").catch(() => null),
-          fetch("http://localhost:4000/courses").catch(() => null),
+          fetch(`${API_BASE}/members`).catch(() => null),
+          fetch(`${API_BASE}/events`).catch(() => null),
+          fetch(`${API_BASE}/courses`).catch(() => null),
         ]);
 
         const members = membersRes?.ok ? await membersRes.json() : [];

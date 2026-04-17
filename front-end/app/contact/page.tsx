@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Mail, MapPin, Linkedin, Send, Sparkles } from "lucide-react";
+import { Mail, MapPin, Send, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { fetchOtherStats, OtherStat } from "@/lib/api";
 
@@ -13,14 +13,25 @@ export default function ContactPage() {
         fetchOtherStats().then(setStats);
     }, []);
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         setStatus("submitting");
-        // Simulate network request
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        setStatus("success");
-        (e.target as HTMLFormElement).reset();
-        setTimeout(() => setStatus("idle"), 3000);
+        const form = e.target as HTMLFormElement;
+        const data = Object.fromEntries(new FormData(form));
+        try {
+            const res = await fetch("/api/contact", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error();
+            setStatus("success");
+            form.reset();
+            setTimeout(() => setStatus("idle"), 4000);
+        } catch {
+            setStatus("error");
+            setTimeout(() => setStatus("idle"), 4000);
+        }
     };
 
     return (
@@ -86,18 +97,15 @@ export default function ContactPage() {
                             <div className="flex flex-col gap-4">
                                 <span className="text-sm font-bold text-gray-900 dark:text-white/80 uppercase tracking-widest">Social Media</span>
                                 <div className="flex gap-4">
-                                    {stats?.club_linked && stats.club_linked !== "empty" && (
-                                        <a href={stats.club_linked} target="_blank" rel="noreferrer" className="p-4 rounded-full bg-black/5 dark:bg-white/5 hover:bg-[#0077b5] hover:text-white dark:hover:bg-[#0077b5] text-gray-600 dark:text-white/60 transition-all hover:scale-110">
-                                            <Linkedin className="w-5 h-5" />
-                                        </a>
-                                    )}
-                                    {stats?.club_x && stats.club_x !== "empty" && (
-                                        <a href={stats.club_x.startsWith("http") ? stats.club_x : `https://x.com/${stats.club_x.replace("@", "")}`} target="_blank" rel="noreferrer" className="p-4 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black text-gray-600 dark:text-white/60 transition-all hover:scale-110">
-                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                                            </svg>
-                                        </a>
-                                    )}
+                                    {/* Hardcoded official accounts */}
+                                    <a href="https://www.linkedin.com/company/eec-kfupm/posts/?feedView=all" target="_blank" rel="noreferrer" className="p-4 rounded-full bg-black/5 dark:bg-white/5 hover:bg-[#0077b5] hover:text-white dark:hover:bg-[#0077b5] text-gray-600 dark:text-white/60 transition-all hover:scale-110">
+                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                                    </a>
+                                    <a href="https://x.com/EEC_KFUPM" target="_blank" rel="noreferrer" className="p-4 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black text-gray-600 dark:text-white/60 transition-all hover:scale-110">
+                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                        </svg>
+                                    </a>
                                     {stats?.club_insta && stats.club_insta !== "empty" && (
                                         <a href={stats.club_insta.startsWith("http") ? stats.club_insta : `https://instagram.com/${stats.club_insta.replace("@", "")}`} target="_blank" rel="noreferrer" className="p-4 rounded-full bg-black/5 dark:bg-white/5 hover:bg-gradient-to-tr hover:from-yellow-400 hover:via-pink-500 hover:to-purple-500 hover:text-white dark:hover:text-white text-gray-600 dark:text-white/60 transition-all hover:scale-110 border-0">
                                             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -126,9 +134,10 @@ export default function ContactPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="flex flex-col gap-2">
                                         <label htmlFor="name" className="text-sm font-bold text-gray-700 dark:text-white/70 uppercase tracking-wider">Your Name <span className="text-neon-blue">*</span></label>
-                                        <input 
-                                            type="text" 
-                                            id="name" 
+                                        <input
+                                            type="text"
+                                            id="name"
+                                            name="name"
                                             required
                                             className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue transition-all"
                                             placeholder="John Doe"
@@ -136,9 +145,10 @@ export default function ContactPage() {
                                     </div>
                                     <div className="flex flex-col gap-2">
                                         <label htmlFor="email" className="text-sm font-bold text-gray-700 dark:text-white/70 uppercase tracking-wider">Email Address <span className="text-neon-blue">*</span></label>
-                                        <input 
-                                            type="email" 
-                                            id="email" 
+                                        <input
+                                            type="email"
+                                            id="email"
+                                            name="email"
                                             required
                                             className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue transition-all"
                                             placeholder="john@example.com"
@@ -148,9 +158,10 @@ export default function ContactPage() {
 
                                 <div className="flex flex-col gap-2">
                                     <label htmlFor="subject" className="text-sm font-bold text-gray-700 dark:text-white/70 uppercase tracking-wider">Subject</label>
-                                    <input 
-                                        type="text" 
-                                        id="subject" 
+                                    <input
+                                        type="text"
+                                        id="subject"
+                                        name="subject"
                                         className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue transition-all"
                                         placeholder="How can we help you?"
                                     />
@@ -158,8 +169,9 @@ export default function ContactPage() {
 
                                 <div className="flex flex-col gap-2">
                                     <label htmlFor="message" className="text-sm font-bold text-gray-700 dark:text-white/70 uppercase tracking-wider">Message <span className="text-neon-blue">*</span></label>
-                                    <textarea 
-                                        id="message" 
+                                    <textarea
+                                        id="message"
+                                        name="message"
                                         required
                                         rows={5}
                                         className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue transition-all resize-none"

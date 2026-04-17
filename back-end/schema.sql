@@ -11,8 +11,16 @@ CREATE TABLE IF NOT EXISTS courses (
   difficulty      NUMERIC(3,1) NOT NULL DEFAULT 3.0,  -- 0.0–5.0
   prerequisites   TEXT,                 -- comma-separated course IDs
   objectives      TEXT,                 -- comma-separated strings
-  books           TEXT                  -- JSON: [{title, file}] — uploaded PDF filenames
+  books           TEXT,                 -- JSON: [{title, file}] — uploaded PDF filenames
+  major_1_date    DATE,
+  major_2_date    DATE,
+  final_date      DATE
 );
+
+-- Add exam date columns to existing tables if not present
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_1_date DATE;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_2_date DATE;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS final_date DATE;
 
 -- ─── Resources ───────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS resources (
@@ -20,7 +28,11 @@ CREATE TABLE IF NOT EXISTS resources (
   course_id      TEXT NOT NULL REFERENCES courses(course_id) ON DELETE CASCADE,
   resource_title TEXT NOT NULL,
   url            TEXT NOT NULL,
-  category       TEXT NOT NULL CHECK (category IN ('Lecture','Exam','Material','Other'))
+  category       TEXT NOT NULL CHECK (category IN ('Lecture','Exam','Material','Other')),
+  sub_category   TEXT,  -- For organizing within categories (e.g., 'Videos', 'Books & Notes', 'Old Exams')
+  semester       TEXT,  -- For exams: e.g., 'Fall 2023', 'Spring 2024'
+  chapter        TEXT,  -- For exams: e.g., 'Chapter 1', 'Chapter 2-3'
+  unit           TEXT   -- For grouping by unit/chapter
 );
 
 -- ─── Events ──────────────────────────────────────────────────────────────────

@@ -1,12 +1,12 @@
 "use client";
 
-import { TiltCard } from "@/components/ui/3DTiltCard";
 import Link from "next/link";
-import { ArrowRight, Zap, Cpu, Calendar } from "lucide-react";
+import { ArrowRight, Zap, Calendar, User } from "lucide-react";
+
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import React, { useEffect } from "react";
 
-import { fetchEvents, getPhotoUrl, Event } from "@/lib/api";
+import { fetchEvents, fetchMembers, getPhotoUrl, Event, Member } from "@/lib/api";
 
 function categoryColor(cat: string) {
     if (cat === "Workshop") return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
@@ -20,12 +20,17 @@ export default function Home() {
     const mouseX = useMotionValue(0);
     const mouseY = useMotionValue(0);
     const [sliderEvents, setSliderEvents] = React.useState<Event[]>([]);
+    const [sliderMembers, setSliderMembers] = React.useState<Member[]>([]);
 
     useEffect(() => {
         fetchEvents().then(evts => {
-            // Exclude ended events, duplicate for seamless loop
             const active = evts.filter(e => e.status?.toLowerCase() !== "ended");
-            setSliderEvents([...active, ...active]); // duplicate for seamless loop
+            setSliderEvents([...active, ...active]);
+        });
+        fetchMembers().then(members => {
+            const current = members.filter(m => String(m.term).trim() === "current");
+            const pool = current.length > 0 ? current : members;
+            setSliderMembers(pool);
         });
     }, []);
 
@@ -134,10 +139,9 @@ export default function Home() {
             {/* Shadows for edge fade effect */}
             <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
             <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
-                        <motion.div 
+                        <motion.div
                 className="flex gap-6 w-max"
-                initial={false}
-                animate={{ x: [0, -1000] }}
+                animate={{ x: ["0%", "-50%"] }}
                 transition={{ repeat: Infinity, ease: "linear", duration: 25 }}
             >
                 {sliderEvents.map((evt, idx) => {
@@ -195,8 +199,54 @@ export default function Home() {
          </div>
       </section>
 
-      {/* Quick Access - 3D Tilt Cards */}
-      
+      {/* Current Members Autoslider */}
+      {sliderMembers.length > 0 && (
+        <section className="w-full relative overflow-hidden flex flex-col gap-6">
+          <div className="flex items-center justify-between z-10">
+            <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)] text-gray-800 dark:text-white/80">
+              Current Members
+            </h2>
+            <Link href="/about" className="text-sm text-neon-blue hover:underline flex items-center gap-1">
+              Meet the Team <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="relative w-full overflow-hidden flex items-center">
+            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
+            <motion.div
+              className="flex gap-6 w-max"
+              initial={{ x: "100vw" }}
+              animate={{ x: "-100%" }}
+              transition={{ repeat: Infinity, ease: "linear", duration: 20 }}
+            >
+              {sliderMembers.map((member, idx) => {
+                const imgUrl = getPhotoUrl(member.image);
+                return (
+                  <Link
+                    key={idx}
+                    href="/about"
+                    className="flex-shrink-0 w-80 h-48 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group relative overflow-hidden backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] block"
+                  >
+                    {imgUrl ? (
+                      <img src={imgUrl} alt={member.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60 mix-blend-overlay dark:opacity-40" />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <User className="w-16 h-16 text-black/10 dark:text-white/10" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1c] via-[#0a0f1c]/60 to-transparent" />
+                    <div className="absolute inset-0 p-5 flex flex-col justify-end z-10">
+                      <p className="font-bold text-lg text-white group-hover:text-neon-blue transition-colors truncate">{member.name}</p>
+                      <p className="text-xs font-mono text-white/50 mt-0.5 truncate uppercase tracking-widest">{member.role}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </motion.div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

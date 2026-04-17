@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { User, Linkedin, Mail, Target, Zap, Globe, LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { User, Mail, Target, Zap, Globe } from "lucide-react";
 import { TiltCard } from "@/components/ui/3DTiltCard";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
-import { fetchMembers, fetchOtherStats, getPhotoUrl, Member, OtherStat } from "@/lib/api";
+import { fetchMembers, getPhotoUrl, Member } from "@/lib/api";
 
 function TeamCard({ member, index }: { member: Member; index: number }) {
     const imgUrl = getPhotoUrl(member.image);
@@ -40,7 +39,9 @@ function TeamCard({ member, index }: { member: Member; index: number }) {
 
                     <div className="flex gap-4 mt-4 opacity-50 group-hover:opacity-100 transition-opacity">
                         {member.linkedin && (
-                            <a href={member.linkedin} className="hover:text-neon-blue transition-colors"><Linkedin className="w-5 h-5"/></a>
+                            <a href={member.linkedin} className="hover:text-neon-blue transition-colors">
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                        </a>
                         )}
                         {member.email && (
                             <a href={`mailto:${member.email}`} className="hover:text-neon-blue transition-colors"><Mail className="w-5 h-5"/></a>
@@ -57,96 +58,61 @@ function TeamCard({ member, index }: { member: Member; index: number }) {
     );
 }
 
-function StatCard({ icon: Icon, value, label, delay }: { icon: LucideIcon; value: string; label: string; delay: number }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay }}
-            className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 flex flex-col items-center justify-center text-center gap-2 group hover:bg-black/5 dark:bg-white/5 transition-colors"
-        >
-            <Icon className="w-8 h-8 text-gray-400 dark:text-white/20 group-hover:text-neon-blue transition-colors mb-2" />
-            <span className="text-4xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white">{value}</span>
-            <span className="text-xs uppercase tracking-widest text-gray-500 dark:text-white/40">{label}</span>
-        </motion.div>
-    );
-}
-
 export default function AboutPage() {
     const [allMembers, setAllMembers] = useState<Member[]>([]);
-    const [stats, setStats] = useState<OtherStat | null>(null);
     const [loading, setLoading] = useState(true);
+    const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
 
     useEffect(() => {
-        Promise.all([
-            fetchMembers(),
-            fetchOtherStats()
-        ])
-        .then(([membersData, statsData]) => {
-            setAllMembers(membersData);
-            setStats(statsData);
-        })
-        .finally(() => setLoading(false));
+        fetchMembers()
+            .then(membersData => {
+                setAllMembers(membersData);
+                // Default to the first term in the list (as entered by admin)
+                const terms = [...new Set(membersData.map(m => String(m.term).trim()))];
+                if (terms.length > 0) setSelectedTerm(terms[0]);
+            })
+            .finally(() => setLoading(false));
     }, []);
 
-    // Group members by term
-    const membersByTerm: Record<number, Member[]> = {};
-    allMembers.forEach(m => {
-        if (!membersByTerm[m.term]) membersByTerm[m.term] = [];
-        membersByTerm[m.term].push(m);
-    });
+    // All unique terms preserving insertion order (admin-defined)
+    const terms = [...new Set(allMembers.map(m => String(m.term).trim()))];
 
-    // Determine current term (fallback to 252 if stats not loaded)
-    const currentTerm = stats?.current_term || 252;
-
-    const currentTermMembers = membersByTerm[currentTerm] ?? [];
-    const pastTerms = Object.entries(membersByTerm)
-        .map(([term, members]) => ({ term: Number(term), members }))
-        .filter(({ term }) => term !== currentTerm)
-        .sort((a, b) => b.term - a.term); // descending
+    // Members for the selected term
+    const visibleMembers = allMembers.filter(m => String(m.term).trim() === selectedTerm);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-deep-space pb-32 pt-24 px-6">
             <div className="max-w-7xl mx-auto flex flex-col gap-24">
 
                 {/* Hero / Mission */}
-                <div className="flex flex-col lg:flex-row gap-12 items-center">
-                    <div className="flex-1 flex flex-col gap-6">
-                        <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white tracking-tight leading-none">
-                            The <span className="text-neon-blue">Collective</span> <br className="hidden md:block" /> Mindset.
-                        </h1>
-                        <p className="text-lg sm:text-xl text-gray-600 dark:text-white/60 leading-relaxed font-light max-w-xl">
-                            We are a community of innovators, builders, and dreamers. The Electrical Engineering Club (EEC) bridges the gap between theoretical academia and hands-on industrial reality.
-                        </p>
-                        <div className="flex flex-wrap gap-4 sm:gap-6 mt-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-neon-blue/10 rounded-lg text-neon-blue"><Zap className="w-4 h-4 sm:w-5 sm:h-5" /></div>
-                                <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Innovation</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400"><Globe className="w-4 h-4 sm:w-5 sm:h-5" /></div>
-                                <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Community</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400"><Target className="w-4 h-4 sm:w-5 sm:h-5" /></div>
-                                <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Excellence</span>
-                            </div>
+                <div className="flex flex-col items-center text-center gap-6">
+                    <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white tracking-tight leading-none">
+                        The <span className="text-neon-blue">Collective</span> <br /> Mindset.
+                    </h1>
+                    <p className="text-lg sm:text-xl text-gray-600 dark:text-white/60 leading-relaxed font-light max-w-2xl">
+                        We are a community of innovators, builders, and dreamers. The Electrical Engineering Club (EEC) bridges the gap between theoretical academia and hands-on industrial reality.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-2">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-neon-blue/10 rounded-lg text-neon-blue"><Zap className="w-4 h-4 sm:w-5 sm:h-5" /></div>
+                            <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Innovation</span>
                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 w-full lg:w-auto">
-                        <StatCard icon={User} value={stats?.active_members?.toString() || "500+"} label="Active Members" delay={0.1} />
-                        <StatCard icon={Zap} value={stats?.workshops_per_year?.toString() || "24"} label="Workshops/Year" delay={0.2} />
-                        <StatCard icon={Target} value={`${stats?.commitment_percentage || 100}%`} label="Commitment" delay={0.3} />
-                        <StatCard icon={Globe} value={stats?.industry_partners?.toString() || "15"} label="Industry Partners" delay={0.4} />
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400"><Globe className="w-4 h-4 sm:w-5 sm:h-5" /></div>
+                            <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Community</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400"><Target className="w-4 h-4 sm:w-5 sm:h-5" /></div>
+                            <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Excellence</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Current Board */}
-                <div className="flex flex-col gap-12">
+                {/* Team Section */}
+                <div className="flex flex-col gap-10">
                     <div className="text-center">
                         <h2 className="text-3xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white mb-4">
-                            Term <span className="text-neon-blue">{currentTerm}</span>
+                            Meet the <span className="text-neon-blue">Team</span>
                         </h2>
                         <div className="w-24 h-1 bg-neon-blue mx-auto rounded-full" />
                     </div>
@@ -157,75 +123,45 @@ export default function AboutPage() {
                         </div>
                     ) : (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                                {currentTermMembers.slice(0, 8).map((member, i) => (
-                                    <TeamCard key={i} member={member} index={i} />
-                                ))}
-                            </div>
-                            {currentTermMembers.length > 8 && (
-                                <div className="mt-4 flex justify-center">
-                                    <Link href={`/about/term/${currentTerm}`} className="px-6 py-2 rounded-full border border-gray-300 dark:border-white/20 text-gray-700 dark:text-white/70 hover:text-neon-blue dark:hover:text-neon-blue hover:border-neon-blue transition-colors font-semibold text-sm">
-                                        Show All / Full Roster
-                                    </Link>
+                            {/* Term Toggle */}
+                            {terms.length > 0 && (
+                                <div className="flex flex-wrap justify-center gap-3">
+                                    {terms.map(term => (
+                                        <button
+                                            key={term}
+                                            onClick={() => setSelectedTerm(term)}
+                                            className={`px-6 py-2.5 rounded-full border font-mono text-sm font-semibold transition-all ${
+                                                selectedTerm === term
+                                                    ? "bg-neon-blue text-white border-neon-blue shadow-[0_0_20px_rgba(6,182,212,0.35)]"
+                                                    : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-neon-blue/50 hover:text-neon-blue"
+                                            }`}
+                                        >
+                                            Term {term}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
+
+                            {/* Members Grid */}
+                            <motion.div
+                                key={selectedTerm}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.25 }}
+                                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+                            >
+                                {visibleMembers.map((member, i) => (
+                                    <TeamCard key={i} member={member} index={i} />
+                                ))}
+                                {visibleMembers.length === 0 && (
+                                    <p className="col-span-full text-center text-gray-400 dark:text-white/30 font-mono py-16">
+                                        No members for this term.
+                                    </p>
+                                )}
+                            </motion.div>
                         </>
                     )}
                 </div>
-
-                {/* Past Terms */}
-                {!loading && pastTerms.length > 0 && (
-                    <div className="flex flex-col gap-16 w-full pb-24">
-                        <div className="text-center">
-                            <h2 className="text-3xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white mb-4">Past Term Members</h2>
-                            <div className="w-24 h-1 bg-neon-blue mx-auto rounded-full mb-8" />
-                            <p className="text-gray-500 dark:text-white/50 max-w-2xl mx-auto">
-                                Honoring the collective minds that have contributed to our growth across all past terms.
-                            </p>
-                        </div>
-
-                        {pastTerms.map(({ term, members }) => (
-                            <div key={term} className="flex flex-col w-full mb-12">
-                                <div className="flex justify-between items-center mb-8 pl-4 pr-4 lg:px-0 z-10 border-b border-black/10 dark:border-white/10 pb-4">
-                                    <h3 className="text-2xl font-bold font-mono text-gray-800 dark:text-white/80">
-                                        Term <span className="text-neon-blue">{term}</span>
-                                    </h3>
-                                    <Link href={`/about/term/${term}`} className="text-sm font-semibold text-gray-500 hover:text-neon-blue dark:text-white/40 dark:hover:text-neon-blue transition-colors flex items-center gap-1">
-                                        View Full Roster →
-                                    </Link>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 w-full">
-                                    {members.slice(0, 5).map((member, idx) => {
-                                        const imgUrl = getPhotoUrl(member.image);
-                                        return (
-                                            <motion.div
-                                                key={idx}
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                whileInView={{ opacity: 1, scale: 1 }}
-                                                viewport={{ once: true }}
-                                                transition={{ delay: idx * 0.05 }}
-                                                className="p-5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/5 hover:border-neon-blue/40 dark:hover:border-neon-blue/40 transition-all flex flex-col items-center text-center gap-4 py-6 group cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 hover:-translate-y-1 shadow-sm hover:shadow-md"
-                                            >
-                                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-black/10 dark:from-white/10 to-transparent flex shrink-0 items-center justify-center border border-black/5 dark:border-white/5 group-hover:bg-neon-blue/10 transition-colors shadow-inner overflow-hidden">
-                                                    {imgUrl ? (
-                                                        <img src={imgUrl} alt={member.name} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <User className="w-7 h-7 text-gray-400 dark:text-white/40 group-hover:text-neon-blue transition-colors" />
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-col w-full">
-                                                    <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-neon-blue transition-colors text-base">{member.name}</h4>
-                                                    <span className="text-xs font-mono text-gray-500 dark:text-white/40 mt-1 uppercase tracking-wider">{member.role}</span>
-                                                </div>
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
         </div>
     );

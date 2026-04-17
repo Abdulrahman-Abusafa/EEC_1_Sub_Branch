@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock, MapPin, ArrowRight } from "lucide-react";
 import { TiltCard } from "@/components/ui/3DTiltCard";
 import { motion } from "framer-motion";
@@ -187,34 +187,45 @@ function ShowMoreButton({ shown, total, onToggle }: { shown: boolean; total: num
     );
 }
 
+type FilterTab = "all" | "current" | "future" | "past";
+
+const TABS: { id: FilterTab; label: string }[] = [
+    { id: "all",     label: "All"      },
+    { id: "current", label: "Current"  },
+    { id: "future",  label: "Upcoming" },
+    { id: "past",    label: "Past"     },
+];
+
 export default function EventsPage() {
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showAllCurrent, setShowAllCurrent] = useState(false);
-    const [showAllFuture, setShowAllFuture] = useState(false);
-    const [showAllPast, setShowAllPast] = useState(false);
+    const [tab, setTab] = useState<FilterTab>("all");
+    const [showAll, setShowAll] = useState(false);
 
     useEffect(() => {
         fetchEvents()
-            .then(data => {
-                const statuses = [...new Set(data.map(e => e.status))];
-                console.log("[Events] raw status values from DB:", statuses);
-                setEvents(data);
-            })
+            .then(data => setEvents(data))
             .finally(() => setLoading(false));
     }, []);
 
-    const current = events.filter(e => classifyEvent(e) === "current");
-    const future  = events.filter(e => classifyEvent(e) === "future");
-    const past    = events.filter(e => classifyEvent(e) === "past");
+    // Reset "show more" when switching tabs
+    const handleTab = (t: FilterTab) => { setTab(t); setShowAll(false); };
 
-    const visibleCurrent = showAllCurrent ? current : current.slice(0, INITIAL_SHOW);
-    const visibleFuture  = showAllFuture  ? future  : future.slice(0, INITIAL_SHOW);
-    const visiblePast    = showAllPast    ? past    : past.slice(0, INITIAL_SHOW);
+    const current  = events.filter(e => classifyEvent(e) === "current");
+    const future   = events.filter(e => classifyEvent(e) === "future");
+    const past     = events.filter(e => classifyEvent(e) === "past");
+
+    const filtered =
+        tab === "current" ? current :
+        tab === "future"  ? future  :
+        tab === "past"    ? past    :
+        events;
+
+    const visible = showAll ? filtered : filtered.slice(0, INITIAL_SHOW);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-deep-space pb-32 pt-24 px-6">
-            <div className="max-w-7xl mx-auto flex flex-col gap-16">
+            <div className="max-w-7xl mx-auto flex flex-col gap-12">
                 <div className="flex flex-col text-center items-center gap-6">
                     <h1 className="text-5xl md:text-7xl font-bold font-[family-name:var(--font-orbitron)] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-500 dark:from-white dark:to-white/40 tracking-tight">
                         Future Timeline
@@ -222,74 +233,51 @@ export default function EventsPage() {
                     <p className="text-gray-600 dark:text-white/60 text-xl max-w-2xl text-center">
                         Join us for cutting-edge workshops, hackathons, and networking events designed to accelerate your engineering journey.
                     </p>
+
+                    {/* Filter Tabs */}
+                    <div className="flex gap-2 mt-2">
+                        {TABS.map(({ id, label }) => (
+                            <button
+                                key={id}
+                                onClick={() => handleTab(id)}
+                                className={`px-5 py-2 rounded-full border font-mono text-sm font-semibold transition-all ${
+                                    tab === id
+                                        ? "bg-neon-blue text-white border-neon-blue shadow-[0_0_20px_rgba(6,182,212,0.35)]"
+                                        : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-neon-blue/50 hover:text-neon-blue"
+                                }`}
+                            >
+                                {label}
+                                {id !== "all" && (
+                                    <span className="ml-2 text-xs opacity-60">
+                                        {id === "current" ? current.length : id === "future" ? future.length : past.length}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {loading ? (
                     <div className="flex justify-center items-center py-32">
                         <DotLottieReact src="/Charging battery.json" loop autoplay className="w-32 h-32" />
                     </div>
+                ) : filtered.length === 0 ? (
+                    <div className="text-center py-24 text-gray-400 dark:text-white/30 font-mono">No events found.</div>
                 ) : (
-                    <div className="flex flex-col gap-24">
-                        {current.length > 0 && (
-                            <section>
-                                <div className="flex items-center gap-4 mb-8 pl-4 border-l-4 border-neon-blue">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-3">
-                                            <h2 className="text-3xl font-bold font-[family-name:var(--font-orbitron)] text-neon-blue">Current Events</h2>
-                                            <div className="flex items-center gap-2 px-3 py-1 bg-neon-blue/10 rounded-full border border-neon-blue/30">
-                                                <span className="w-2 h-2 rounded-full bg-neon-blue animate-pulse" />
-                                                <span className="text-xs font-mono text-neon-blue/80 uppercase tracking-widest">Live Now</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-sm text-blue-700 dark:text-blue-500/60 font-mono">These events are happening right now</p>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {visibleCurrent.map((event, i) => <EventCard key={i} event={event} index={i} status="current" />)}
-                                </div>
-                                <ShowMoreButton shown={showAllCurrent} total={current.length} onToggle={() => setShowAllCurrent(p => !p)} />
-                            </section>
-                        )}
-
-                        {future.length > 0 && (
-                            <section>
-                                <div className="flex items-center gap-4 mb-8 pl-4 border-l-4 border-indigo-500">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-3">
-                                            <h2 className="text-3xl font-bold font-[family-name:var(--font-orbitron)] text-indigo-400 dark:text-indigo-300">Upcoming Events</h2>
-                                            <div className="flex items-center gap-2 px-3 py-1 bg-indigo-500/10 rounded-full border border-indigo-400/30">
-                                                <span className="text-xs font-mono text-indigo-300 uppercase tracking-widest">Soon</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-sm text-indigo-700 dark:text-indigo-500/60 font-mono">Mark your calendar for these events</p>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {visibleFuture.map((event, i) => <EventCard key={i} event={event} index={i} status="future" />)}
-                                </div>
-                                <ShowMoreButton shown={showAllFuture} total={future.length} onToggle={() => setShowAllFuture(p => !p)} />
-                            </section>
-                        )}
-
-                        {past.length > 0 && (
-                            <section>
-                                <div className="mb-8 pl-4 border-l-4 border-gray-400/30">
-                                    <div className="flex flex-col gap-1">
-                                        <h2 className="text-3xl font-bold font-[family-name:var(--font-orbitron)] text-gray-400 dark:text-white/40">Past Events</h2>
-                                        <p className="text-sm text-gray-400/60 dark:text-white/30 font-mono">A look back at what we&apos;ve done</p>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {visiblePast.map((event, i) => <EventCard key={i} event={event} index={i} status="past" />)}
-                                </div>
-                                <ShowMoreButton shown={showAllPast} total={past.length} onToggle={() => setShowAllPast(p => !p)} />
-                            </section>
-                        )}
-
-                        {!loading && events.length === 0 && (
-                            <div className="text-center py-24 text-gray-400 dark:text-white/30 font-mono">No events found.</div>
-                        )}
-                    </div>
+                    <>
+                        <motion.div
+                            key={tab}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="grid grid-cols-1 md:grid-cols-2 gap-8"
+                        >
+                            {visible.map((event, i) => (
+                                <EventCard key={i} event={event} index={i} status={classifyEvent(event)} />
+                            ))}
+                        </motion.div>
+                        <ShowMoreButton shown={showAll} total={filtered.length} onToggle={() => setShowAll(p => !p)} />
+                    </>
                 )}
             </div>
         </div>

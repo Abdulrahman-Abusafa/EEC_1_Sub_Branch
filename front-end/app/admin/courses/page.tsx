@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, X, Book } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen } from "lucide-react";
+import { fetchCourseResources, createResource, deleteResource, Resource } from "@/lib/api";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type BookItem = { title: string; url: string; file?: File };
 
@@ -9,9 +12,9 @@ type Course = {
   course_name: string;
   title: string;
   description: string;
-  level: string;
+  level: number;
   credits: number;
-  difficulty: string;
+  difficulty: number;
   prerequisites: string[];
   objectives: string[];
   books: BookItem[];
@@ -27,24 +30,74 @@ export default function CoursesAdmin() {
   const [courseIdStr, setCourseIdStr] = useState("");
   const [courseTitle, setCourseTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [level, setLevel] = useState("Undergraduate");
+  const [level, setLevel] = useState(1);
   const [credits, setCredits] = useState(3);
-  const [difficulty, setDifficulty] = useState("Intermediate");
+  const [difficulty, setDifficulty] = useState(3.0);
   const [prereqStr, setPrereqStr] = useState("");
   const [objStr, setObjStr] = useState("");
   const [books, setBooks] = useState<BookItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Resources State - restructured for bulk management
+  const [videos, setVideos] = useState<{ title: string; url: string }[]>([]);
+  type BookNoteItem = { title: string; url: string; file?: File };
+  const [booksAndNotes, setBooksAndNotes] = useState<BookNoteItem[]>([]);
+  type ExamItem = { term: string; url: string; file?: File };
+  const [oldExams, setOldExams] = useState<{
+    major1: ExamItem[];
+    major2: ExamItem[];
+    final: ExamItem[];
+  }>({ major1: [], major2: [], final: [] });
+
   const fetchCourses = async () => {
     try {
-      const res = await fetch("http://localhost:4000/courses");
+      const res = await fetch(`${API_BASE}/courses`);
       if (res.ok) {
-        setCourses(await res.json());
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setCourses(data);
+        } else {
+          console.error("Invalid courses data format", data);
+          alert("Error: Invalid courses format from server");
+        }
+      } else {
+        console.error(`Failed to fetch courses: ${res.status} ${res.statusText}`);
+        alert(`Failed to load courses: ${res.statusText || "Server error"}`);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error fetching courses:", e);
+      alert(`Error loading courses: ${e instanceof Error ? e.message : "Unknown error"}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchResources = async (courseId: string) => {
+    try {
+      const resourcesData = await fetchCourseResources(courseId);
+      const videosList: { title: string; url: string }[] = [];
+      const booksAndNotesList: { title: string; url: string }[] = [];
+      const examsData: { major1: ExamItem[]; major2: ExamItem[]; final: ExamItem[] } = { major1: [], major2: [], final: [] };
+
+      resourcesData.forEach(resource => {
+        if (resource.sub_category === 'Videos') {
+          videosList.push({ title: resource.resource_title, url: resource.url });
+        } else if (resource.sub_category === 'Books & Notes') {
+          booksAndNotesList.push({ title: resource.resource_title, url: resource.url });
+        } else if (resource.sub_category === 'Major 1') {
+          examsData.major1.push({ term: resource.semester || '', url: resource.url });
+        } else if (resource.sub_category === 'Major 2') {
+          examsData.major2.push({ term: resource.semester || '', url: resource.url });
+        } else if (resource.sub_category === 'Final') {
+          examsData.final.push({ term: resource.semester || '', url: resource.url });
+        }
+      });
+
+      setVideos(videosList);
+      setBooksAndNotes(booksAndNotesList);
+      setOldExams(examsData);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -56,12 +109,15 @@ export default function CoursesAdmin() {
     setCourseIdStr("");
     setCourseTitle("");
     setDescription("");
-    setLevel("Undergraduate");
+    setLevel(1);
     setCredits(3);
-    setDifficulty("Intermediate");
+    setDifficulty(3.0);
     setPrereqStr("");
     setObjStr("");
     setBooks([]);
+    setVideos([]);
+    setBooksAndNotes([]);
+    setOldExams({ major1: [], major2: [], final: [] });
     setEditingCourseId(null);
   };
 
@@ -75,19 +131,23 @@ export default function CoursesAdmin() {
     setCourseIdStr(c.course_name);
     setCourseTitle(c.title);
     setDescription(c.description || "");
-    setLevel(c.level || "Undergraduate");
+    setLevel(typeof c.level === 'string' ? parseInt(c.level) : c.level || 1);
     setCredits(c.credits || 3);
-    setDifficulty(c.difficulty || "Intermediate");
-    setPrereqStr(c.prerequisites ? c.prerequisites.join(", ") : "");
-    setObjStr(c.objectives ? c.objectives.join("\\n") : "");
+    setDifficulty(typeof c.difficulty === 'string' ? parseFloat(c.difficulty) : c.difficulty || 3.0);
+    setPrereqStr(Array.isArray(c.prerequisites) ? c.prerequisites.join(", ") : c.prerequisites || "");
+    setObjStr(Array.isArray(c.objectives) ? c.objectives.join("\n") : c.objectives || "");
     setBooks(c.books || []);
+    
+    // Load existing resources into structured format
+    fetchResources(c.course_name);
+    
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this course?")) return;
     try {
-      await fetch(`http://localhost:4000/courses/${id}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/courses/${id}`, { method: "DELETE" });
       fetchCourses();
     } catch (e) {
       console.error(e);
@@ -97,7 +157,7 @@ export default function CoursesAdmin() {
   const uploadBookAndGetUrl = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("http://localhost:4000/upload/pdf", {
+    const res = await fetch(`${API_BASE}/upload/pdf`, {
       method: "POST",
       body: formData,
     });
@@ -106,12 +166,24 @@ export default function CoursesAdmin() {
     return data.url;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      // Validate required fields
+      if (!courseIdStr.trim()) {
+        alert("Course ID is required");
+        setIsSubmitting(false);
+        return;
+      }
+      if (!courseTitle.trim()) {
+        alert("Course Title is required");
+        setIsSubmitting(false);
+        return;
+      }
+
       // 1. Upload any new PDFs first
-      const processedBooks = await Promise.all(
+      const processedBooks = (await Promise.all(
         books.map(async (b) => {
           if (b.file) {
             const url = await uploadBookAndGetUrl(b.file);
@@ -119,24 +191,24 @@ export default function CoursesAdmin() {
           }
           return { title: b.title, url: b.url };
         })
-      );
+      )).filter(b => b.title.trim()); // Filter out empty titles
 
-      // 2. Prepare payload
+      // 2. Prepare course payload
       const payload = {
         course_id: courseIdStr,
         title: courseTitle,
         description,
-        level,
+        level: Number(level),
         credits: Number(credits),
-        difficulty,
+        difficulty: Number(difficulty),
         prerequisites: prereqStr.split(",").map(s => s.trim()).filter(Boolean),
-        objectives: objStr.split("\\n").map(s => s.trim()).filter(Boolean),
-        books: processedBooks
+        objectives: objStr.split("\n").map(s => s.trim()).filter(Boolean),
+        books: processedBooks as Array<{ title: string; url: string }>
       };
 
       const url = editingCourseId
-        ? `http://localhost:4000/courses/${editingCourseId}`
-        : "http://localhost:4000/courses";
+        ? `${API_BASE}/courses/${editingCourseId}`
+        : `${API_BASE}/courses`;
       const method = editingCourseId ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -145,17 +217,114 @@ export default function CoursesAdmin() {
         body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
-        setIsModalOpen(false);
-        fetchCourses();
-      } else {
-        alert("Failed to save course");
+      if (!res.ok) {
+        let errorMsg = "Unknown error";
+        try {
+          const errorData = await res.json();
+          errorMsg = typeof errorData.error === 'string' 
+            ? errorData.error 
+            : typeof errorData === 'object'
+              ? Object.values(errorData).find(v => typeof v === 'string') as string || "Server error"
+              : "Server error";
+        } catch (e) {
+          errorMsg = res.statusText || "Server error";
+        }
+        console.error("Server error response:", String(errorMsg).slice(0, 200));
+        alert(`Failed to save course: ${String(errorMsg).slice(0, 200)}`);
+        return;
       }
+
+      // 3. Save resources for both add and edit flows
+      await saveAllResources(courseIdStr);
+
+      setIsModalOpen(false);
+      fetchCourses();
     } catch (e) {
       console.error(e);
       alert("An error occurred while saving the course");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const saveAllResources = async (courseId: string) => {
+    try {
+      // Delete existing resources
+      try {
+        const existingResources = await fetchCourseResources(courseId);
+        await Promise.all(existingResources.map(r => deleteResource(r.id!)));
+      } catch (e) {
+        // If there are no resources yet, that's fine
+        console.log("No existing resources to delete");
+      }
+
+      // Create new resources
+      const allResources: Omit<Resource, 'id'>[] = [];
+
+      // Add videos
+      videos.forEach(video => {
+        allResources.push({
+          course_id: courseId,
+          resource_title: video.title,
+          url: video.url,
+          category: 'Lecture',
+          sub_category: 'Videos'
+        });
+      });
+
+      // Add books and notes — upload any new PDF files first
+      for (const item of booksAndNotes) {
+        let url = item.url;
+        if (item.file) {
+          const formData = new FormData();
+          formData.append('file', item.file);
+          const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
+          if (!uploadRes.ok) throw new Error('Books & Notes PDF upload failed');
+          const uploadData = await uploadRes.json();
+          url = `${API_BASE}${uploadData.url}`;
+        }
+        if (!url) continue;
+        allResources.push({
+          course_id: courseId,
+          resource_title: item.title,
+          url,
+          category: 'Material',
+          sub_category: 'Books & Notes'
+        });
+      }
+
+      // Add old exams — upload any new PDF files first
+      const examLabels: Record<string, string> = { major1: 'Major 1', major2: 'Major 2', final: 'Final' };
+      for (const [key, items] of Object.entries(oldExams) as [keyof typeof oldExams, ExamItem[]][]) {
+        for (const item of items) {
+          let url = item.url;
+          if (item.file) {
+            const formData = new FormData();
+            formData.append('file', item.file);
+            const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
+            if (!uploadRes.ok) throw new Error('Exam PDF upload failed');
+            const uploadData = await uploadRes.json();
+            url = `${API_BASE}${uploadData.url}`;
+          }
+          if (!url) continue;
+          allResources.push({
+            course_id: courseId,
+            resource_title: `${examLabels[key]} Exam - ${item.term}`,
+            url,
+            category: 'Exam',
+            sub_category: examLabels[key],
+            semester: item.term,
+          });
+        }
+      }
+
+      // Save all resources
+      if (allResources.length > 0) {
+        await Promise.all(allResources.map(resource => createResource(resource)));
+      }
+    } catch (e) {
+      console.error('Failed to save resources:', e);
+      // Don't throw - allow course to be saved even if resources fail
     }
   };
 
@@ -249,16 +418,16 @@ export default function CoursesAdmin() {
                       <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue"></textarea>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Level</label>
-                      <input type="text" value={level} onChange={e => setLevel(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Level (1-5)</label>
+                      <input type="number" min="1" max="5" value={level} onChange={e => setLevel(Number(e.target.value))} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Credits</label>
                       <input type="number" value={credits} onChange={e => setCredits(Number(e.target.value))} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Difficulty</label>
-                      <input type="text" value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Difficulty (0.0-5.0)</label>
+                      <input type="number" min="0" max="5" step="0.1" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prerequisites (comma separated)</label>
@@ -270,39 +439,208 @@ export default function CoursesAdmin() {
                     </div>
                   </div>
 
+  
+
                   <div className="pt-4 border-t border-gray-200 dark:border-zinc-800">
-                    <div className="flex justify-between items-center mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Course Materials (PDFs)</label>
-                      <button type="button" onClick={() => setBooks([...books, { title: "", url: "" }])} className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-300 px-3 py-1 rounded">Add Material</button>
-                    </div>
-                    {books.map((b, i) => (
-                      <div key={i} className="flex items-center gap-3 mb-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
-                        <Book size={16} className="text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Material Title"
-                          value={b.title}
-                          onChange={(e) => {
-                            const newBooks = [...books];
-                            newBooks[i].title = e.target.value;
-                            setBooks(newBooks);
-                          }}
-                          className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none"
-                        />
-                        <div className="flex-1">
-                           {b.url && !b.file ? (
-                             <span className="text-xs text-green-500 truncate block">Stored on server</span>
-                           ) : (
-                             <input type="file" accept="application/pdf" onChange={(e) => {
-                               const newBooks = [...books];
-                               newBooks[i].file = e.target.files?.[0] || undefined;
-                               setBooks(newBooks);
-                             }} className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white" />
-                           )}
-                        </div>
-                        <button type="button" onClick={() => setBooks(books.filter((_, idx) => idx !== i))} className="text-red-500 p-1 hover:bg-red-500/10 rounded"><X size={16} /></button>
+                    <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white">Course Resources</h3>
+
+                    {/* Videos Section */}
+                    <div className="mb-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <Play size={16} className="text-neon-blue" />
+                          Videos Section
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setVideos([...videos, { title: "", url: "" }])}
+                          className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-300 px-3 py-1 rounded"
+                        >
+                          Add Playlist
+                        </button>
                       </div>
-                    ))}
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Add multiple direct links to video explanations. Each link should lead to a playlist.</p>
+                      {videos.map((video, i) => (
+                        <div key={i} className="flex items-center gap-3 mb-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 w-8">{i + 1}.</span>
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              placeholder="Playlist Title (e.g., Complete EE201 Playlist)"
+                              value={video.title}
+                              onChange={(e) => {
+                                const newVideos = [...videos];
+                                newVideos[i].title = e.target.value;
+                                setVideos(newVideos);
+                              }}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <input
+                              type="url"
+                              placeholder="Playlist URL"
+                              value={video.url}
+                              onChange={(e) => {
+                                const newVideos = [...videos];
+                                newVideos[i].url = e.target.value;
+                                setVideos(newVideos);
+                              }}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setVideos(videos.filter((_, idx) => idx !== i))}
+                            className="text-red-500 p-2 hover:bg-red-500/10 rounded"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      {videos.length === 0 && (
+                        <p className="text-sm text-gray-400 dark:text-gray-500 italic">No video playlists added yet</p>
+                      )}
+                    </div>
+
+                    {/* Books & Notes Section */}
+                    <div className="mb-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <BookOpen size={16} className="text-neon-blue" />
+                          Books & Notes Section
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setBooksAndNotes([...booksAndNotes, { title: "", url: "", file: undefined }])}
+                          className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-300 px-3 py-1 rounded"
+                        >
+                          Add Resource
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Add multiple PDF files in order: First PDF → Main textbook, Second PDF → Professor's notes, etc.</p>
+                      {booksAndNotes.map((item, i) => (
+                        <div key={i} className="flex items-center gap-3 mb-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 w-8">{i + 1}.</span>
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              placeholder={`Resource ${i + 1} (e.g., ${i === 0 ? 'Main Textbook' : i === 1 ? 'Dr. Smith Notes' : 'Additional Notes'})`}
+                              value={item.title}
+                              onChange={(e) => {
+                                const newItems = [...booksAndNotes];
+                                newItems[i].title = e.target.value;
+                                setBooksAndNotes(newItems);
+                              }}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            {item.url && !item.file ? (
+                              <span className="text-xs text-green-500">Uploaded</span>
+                            ) : (
+                              <input
+                                type="file"
+                                accept="application/pdf"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const newItems = [...booksAndNotes];
+                                  newItems[i] = { ...newItems[i], file };
+                                  setBooksAndNotes(newItems);
+                                }}
+                                className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                              />
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setBooksAndNotes(booksAndNotes.filter((_, idx) => idx !== i))}
+                            className="text-red-500 p-2 hover:bg-red-500/10 rounded"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      {booksAndNotes.length === 0 && (
+                        <p className="text-sm text-gray-400 dark:text-gray-500 italic">No books or notes added yet</p>
+                      )}
+                    </div>
+
+                    {/* Old Exams Section */}
+                    <div className="mb-6">
+                      <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                        <Calculator size={16} className="text-neon-blue" />
+                        Old Exams Section
+                      </h4>
+
+                      {(['major1', 'major2', 'final'] as const).map((examType) => {
+                        const label = examType === 'major1' ? 'Major 1' : examType === 'major2' ? 'Major 2' : 'Final';
+                        const items = oldExams[examType];
+                        return (
+                          <div key={examType} className="mb-4 p-4 border border-gray-200 dark:border-zinc-700 rounded-lg">
+                            <div className="flex justify-between items-center mb-3">
+                              <h5 className="font-medium text-gray-800 dark:text-gray-200">{label} Exams</h5>
+                              <button
+                                type="button"
+                                onClick={() => setOldExams(prev => ({ ...prev, [examType]: [...prev[examType], { term: '', url: '' }] }))}
+                                className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-300 px-3 py-1 rounded"
+                              >
+                                + Add Exam
+                              </button>
+                            </div>
+
+                            {items.length === 0 ? (
+                              <p className="text-sm text-gray-400 dark:text-gray-500 italic">No exams added yet</p>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                {items.map((item, i) => (
+                                  <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400 w-6 shrink-0">{i + 1}.</span>
+                                    <input
+                                      type="text"
+                                      placeholder="Term (e.g. 241, 242, 251)"
+                                      value={item.term}
+                                      onChange={(e) => {
+                                        const updated = [...items];
+                                        updated[i] = { ...updated[i], term: e.target.value };
+                                        setOldExams(prev => ({ ...prev, [examType]: updated }));
+                                      }}
+                                      className="w-36 shrink-0 px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                                    />
+                                    <div className="flex-1">
+                                      {item.url && !item.file ? (
+                                        <span className="text-xs text-green-500">Uploaded</span>
+                                      ) : (
+                                        <input
+                                          type="file"
+                                          accept="application/pdf"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            const updated = [...items];
+                                            updated[i] = { ...updated[i], file };
+                                            setOldExams(prev => ({ ...prev, [examType]: updated }));
+                                          }}
+                                          className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                        />
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setOldExams(prev => ({ ...prev, [examType]: prev[examType].filter((_, idx) => idx !== i) }))}
+                                      className="text-red-500 p-1 hover:bg-red-500/10 rounded shrink-0"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="pt-6 flex justify-end gap-3">
@@ -316,6 +654,7 @@ export default function CoursesAdmin() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

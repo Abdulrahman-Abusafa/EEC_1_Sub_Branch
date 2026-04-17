@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 import { Plus, Edit2, Trash2, X, Link as LinkIcon, CalendarDays } from "lucide-react";
 
 type Event = {
@@ -31,13 +33,13 @@ export default function EventsAdmin() {
   const [time, setTime] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [status, setStatus] = useState("upcoming");
+  const [status, setStatus] = useState("Upcoming");
   const [registrationLink, setRegistrationLink] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   const fetchEvents = async () => {
     try {
-      const res = await fetch("http://localhost:4000/events");
+      const res = await fetch(`${API_BASE}/events`);
       if (res.ok) {
         setEvents(await res.json());
       }
@@ -80,7 +82,7 @@ export default function EventsAdmin() {
     setTime(ev.time || "");
     setStartDate(ev.start_date ? new Date(ev.start_date).toISOString().split('T')[0] : "");
     setEndDate(ev.end_date ? new Date(ev.end_date).toISOString().split('T')[0] : "");
-    setStatus(ev.status || "upcoming");
+    setStatus(ev.status || "Upcoming");
     setRegistrationLink(ev.registration_link || "");
     setImageFile(null);
     setIsModalOpen(true);
@@ -89,14 +91,14 @@ export default function EventsAdmin() {
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this event?")) return;
     try {
-      await fetch(`http://localhost:4000/events/${id}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/events/${id}`, { method: "DELETE" });
       fetchEvents();
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData();
     formData.append("event_title", eventTitle);
@@ -114,8 +116,8 @@ export default function EventsAdmin() {
 
     try {
       const url = editingEvent
-        ? `http://localhost:4000/events/${editingEvent.id}`
-        : "http://localhost:4000/events";
+        ? `${API_BASE}/events/${editingEvent.id}`
+        : `${API_BASE}/events`;
       const method = editingEvent ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -183,7 +185,7 @@ export default function EventsAdmin() {
                     </td>
                     <td className="p-4 text-gray-600 dark:text-gray-400">{ev.location}</td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 text-xs rounded-full font-medium ${ev.status === 'upcoming' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                      <span className={`px-2 py-1 text-xs rounded-full font-medium ${ev.status === 'Upcoming' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : ev.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
                         {ev.status}
                       </span>
                     </td>
@@ -244,15 +246,20 @@ export default function EventsAdmin() {
                       <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue [color-scheme:light] dark:[color-scheme:dark]" />
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
+                      <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue [color-scheme:light] dark:[color-scheme:dark]" />
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time</label>
                       <input type="text" value={time} onChange={e => setTime(e.target.value)} placeholder="e.g. 6:00 PM - 8:00 PM" className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                       <select value={status} onChange={e => setStatus(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue">
-                        <option value="upcoming" className="dark:bg-zinc-800">Upcoming</option>
-                        <option value="past" className="dark:bg-zinc-800">Past</option>
-                        <option value="ongoing" className="dark:bg-zinc-800">Ongoing</option>
+                        <option value="Auto" className="dark:bg-zinc-800">Auto</option>
+                        <option value="Upcoming" className="dark:bg-zinc-800">Upcoming</option>
+                        <option value="Active" className="dark:bg-zinc-800">Active</option>
+                        <option value="Complete" className="dark:bg-zinc-800">Complete</option>
                       </select>
                     </div>
                     <div>

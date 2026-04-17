@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 import { Plus, Edit2, Trash2, X, Image as ImageIcon } from "lucide-react";
 
 type Member = {
@@ -25,11 +27,12 @@ export default function MembersAdmin() {
   const [linkedin, setLinkedin] = useState("");
   const [sortOrder, setSortOrder] = useState("");
   const [term, setTerm] = useState("1");
+  const [isCurrent, setIsCurrent] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   const fetchMembers = async () => {
     try {
-      const res = await fetch("http://localhost:4000/members");
+      const res = await fetch(`${API_BASE}/members`);
       if (res.ok) {
         setMembers(await res.json());
       }
@@ -50,6 +53,7 @@ export default function MembersAdmin() {
     setLinkedin("");
     setSortOrder("");
     setTerm("1");
+    setIsCurrent(false);
     setImageFile(null);
     setEditingMember(null);
   };
@@ -66,6 +70,7 @@ export default function MembersAdmin() {
     setLinkedin(member.linkedin || "");
     setSortOrder(member.sort_order?.toString() || "");
     setTerm(member.term || "1");
+    setIsCurrent(member.term === "current");
     setImageFile(null);
     setIsModalOpen(true);
   };
@@ -73,14 +78,14 @@ export default function MembersAdmin() {
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this member?")) return;
     try {
-      await fetch(`http://localhost:4000/members/${id}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/members/${id}`, { method: "DELETE" });
       fetchMembers();
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData();
     formData.append("name", name);
@@ -94,8 +99,8 @@ export default function MembersAdmin() {
 
     try {
       const url = editingMember
-        ? `http://localhost:4000/members/${editingMember.id}`
-        : "http://localhost:4000/members";
+        ? `${API_BASE}/members/${editingMember.id}`
+        : `${API_BASE}/members`;
       const method = editingMember ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -156,7 +161,7 @@ export default function MembersAdmin() {
                   <tr key={member.id} className="border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50 dark:hover:bg-zinc-800/20 transition">
                     <td className="p-4 text-gray-800 dark:text-gray-300 font-medium flex items-center gap-3">
                       {member.image && member.image[0] ? (
-                        <img src={`http://localhost:4000/image?token=${member.image[0].token}`} alt={member.name} className="w-10 h-10 rounded-full object-cover bg-gray-200" />
+                        <img src={`${API_BASE}/image?token=${member.image[0].token}`} alt={member.name} className="w-10 h-10 rounded-full object-cover bg-gray-200" />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-zinc-700 flex items-center justify-center text-gray-500"><ImageIcon size={20} /></div>
                       )}
@@ -209,8 +214,22 @@ export default function MembersAdmin() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Term</label>
-                      <input type="text" value={term} onChange={e => setTerm(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Term</label>
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isCurrent}
+                            onChange={e => {
+                              setIsCurrent(e.target.checked);
+                              if (e.target.checked) setTerm("current");
+                            }}
+                            className="w-4 h-4 accent-neon-blue"
+                          />
+                          <span className="text-xs font-medium text-neon-blue">Current</span>
+                        </label>
+                      </div>
+                      <input type="text" value={term} onChange={e => { setTerm(e.target.value); setIsCurrent(false); }} disabled={isCurrent} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue disabled:opacity-50" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sort Order</label>
