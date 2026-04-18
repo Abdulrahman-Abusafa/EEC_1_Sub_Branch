@@ -17,11 +17,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
   const { path } = await params;
   const url = `${BACKEND}/${path.join("/")}`;
   const contentType = req.headers.get("Content-Type") || "";
-  const body = contentType.includes("multipart") ? await req.formData() : await req.text();
   const res = await fetch(url, {
     method: "POST",
-    headers: contentType.includes("multipart") ? {} : { "Content-Type": contentType },
-    body: body as BodyInit,
+    headers: contentType ? { "Content-Type": contentType } : {},
+    body: req.body,
+    // @ts-expect-error duplex required for streaming body
+    duplex: "half",
   });
   const data = await res.text();
   return new NextResponse(data, {
@@ -34,11 +35,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ path
   const { path } = await params;
   const url = `${BACKEND}/${path.join("/")}`;
   const contentType = req.headers.get("Content-Type") || "";
-  const body = contentType.includes("multipart") ? await req.formData() : await req.text();
   const res = await fetch(url, {
     method: "PUT",
-    headers: contentType.includes("multipart") ? {} : { "Content-Type": contentType },
-    body: body as BodyInit,
+    headers: contentType ? { "Content-Type": contentType } : {},
+    body: req.body,
+    // @ts-expect-error duplex required for streaming body
+    duplex: "half",
   });
   const data = await res.text();
   return new NextResponse(data, {
@@ -47,7 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ path
   });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   const url = `${BACKEND}/${path.join("/")}`;
   const res = await fetch(url, { method: "DELETE" });
