@@ -14,7 +14,10 @@ export async function GET(request: NextRequest) {
         const res = await fetch(upstream, { cache: "no-store" });
 
         if (!res.ok) {
-            return new NextResponse("Failed to fetch image", { status: res.status });
+            return new NextResponse("Failed to fetch image", {
+                status: res.status,
+                headers: { "Cache-Control": "no-store" },
+            });
         }
 
         const contentType = res.headers.get("content-type") ?? "image/jpeg";
