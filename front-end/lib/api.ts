@@ -13,7 +13,7 @@ type ImageAttachment = {
 
 export function getPhotoUrl(photo: ImageAttachment[] | string | null | undefined): string | null {
   if (!photo || !Array.isArray(photo) || photo.length === 0) return null;
-  return `/api/image?token=${photo[0].token}`;
+  return `/api/image/${photo[0].token}`;
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
