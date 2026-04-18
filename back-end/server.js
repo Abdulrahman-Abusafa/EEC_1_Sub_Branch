@@ -99,11 +99,6 @@ const uploadPdf = multer({
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-// ─── File Uploads ─────────────────────────────────────────────────────────────
-app.post("/upload/pdf", uploadPdf.single("file"), (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    res.json({ filename: req.file.filename, path: `/files/${req.file.filename}` });
-});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  COURSES
