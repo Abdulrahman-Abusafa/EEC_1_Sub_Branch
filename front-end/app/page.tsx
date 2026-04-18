@@ -226,19 +226,18 @@ export default function Home() {
                   <Link
                     key={idx}
                     href="/about"
-                    className="flex-shrink-0 w-80 h-48 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group relative overflow-hidden backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] block"
+                    className="flex-shrink-0 w-48 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] flex flex-col items-center gap-3 p-5"
                   >
-                    {imgUrl ? (
-                      <img src={imgUrl} alt={member.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60 mix-blend-overlay dark:opacity-40" />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <User className="w-16 h-16 text-black/10 dark:text-white/10" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1c] via-[#0a0f1c]/60 to-transparent" />
-                    <div className="absolute inset-0 p-5 flex flex-col justify-end z-10">
-                      <p className="font-bold text-lg text-white group-hover:text-neon-blue transition-colors truncate">{member.name}</p>
-                      <p className="text-xs font-mono text-white/50 mt-0.5 truncate uppercase tracking-widest">{member.role}</p>
+                    <div className="w-16 h-16 rounded-full overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 bg-black/10 dark:bg-white/10 flex items-center justify-center">
+                      {imgUrl ? (
+                        <img src={imgUrl} alt={member.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-8 h-8 text-black/20 dark:text-white/20" />
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <p className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-neon-blue transition-colors truncate max-w-[9rem]">{member.name}</p>
+                      <p className="text-xs font-mono text-gray-500 dark:text-white/50 mt-0.5 truncate uppercase tracking-widest max-w-[9rem]">{member.role}</p>
                     </div>
                   </Link>
                 );

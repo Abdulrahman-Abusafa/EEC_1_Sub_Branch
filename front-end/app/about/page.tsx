@@ -136,7 +136,7 @@ export default function AboutPage() {
                                                     : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-600 dark:text-white/60 hover:border-neon-blue/50 hover:text-neon-blue"
                                             }`}
                                         >
-                                            Term {term}
+                                            {term.toLowerCase() === "current" ? "Current Term" : `Term ${term}`}
                                         </button>
                                     ))}
                                 </div>
