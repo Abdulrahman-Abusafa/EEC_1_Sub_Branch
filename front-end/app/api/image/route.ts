@@ -7,7 +7,9 @@ export async function GET(request: NextRequest) {
         return new NextResponse("Missing token", { status: 400 });
     }
 
-    const apiBase = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+    const apiBase = process.env.NODE_ENV === "production"
+        ? "http://76.13.155.82:4000"
+        : "http://localhost:4000";
     const upstream = `${apiBase}/image?token=${encodeURIComponent(token)}`;
 
     try {
