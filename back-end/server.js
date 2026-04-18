@@ -351,7 +351,7 @@ app.post("/events", upload.single("image"), async (req, res) => {
                            start_date, end_date, status, registration_link, image)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
             [event_title, description, category, location, time,
-                start_date, end_date, status, registration_link, image]
+                start_date || null, end_date || null, status, registration_link, image]
         );
         res.status(201).json(rows[0]);
     } catch (err) {
@@ -368,7 +368,7 @@ app.put("/events/:id", upload.single("image"), async (req, res) => {
         // Get existing image if no new file was uploaded
         let imageUpdate = "";
         const params = [event_title, description, category, location, time,
-            start_date, end_date, status, registration_link];
+            start_date || null, end_date || null, status, registration_link];
         if (req.file) {
             const token = req.file.filename;
             params.push(JSON.stringify([{ token, name: req.file.originalname }]));
