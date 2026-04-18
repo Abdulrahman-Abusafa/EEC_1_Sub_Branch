@@ -5,3 +5,9 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[[redirects]]
+  from = "/api/backend/*"
+  to = "http://76.13.155.82:4000/:splat"
+  status = 200
+  force = true
