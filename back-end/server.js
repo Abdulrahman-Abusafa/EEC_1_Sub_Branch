@@ -44,7 +44,10 @@ redisClient.on("error", (err) => {
 // Helper functions for optional redis usage
 async function getCache(key) {
     if (!isRedisConnected) return null;
-    try { return await redisClient.get(key); } catch (e) { return null; }
+    try {
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 500));
+        return await Promise.race([redisClient.get(key), timeout]);
+    } catch (e) { return null; }
 }
 async function setCache(key, value, options) {
     if (!isRedisConnected) return;
