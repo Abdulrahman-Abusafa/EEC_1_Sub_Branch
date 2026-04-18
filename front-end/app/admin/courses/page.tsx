@@ -281,7 +281,7 @@ export default function CoursesAdmin() {
           const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
           if (!uploadRes.ok) throw new Error('Books & Notes PDF upload failed');
           const uploadData = await uploadRes.json();
-          url = `${API_BASE}${uploadData.url}`;
+          url = `/api/files/${uploadData.filename}`;
         }
         if (!url) continue;
         allResources.push({
@@ -304,7 +304,7 @@ export default function CoursesAdmin() {
             const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
             if (!uploadRes.ok) throw new Error('Exam PDF upload failed');
             const uploadData = await uploadRes.json();
-            url = `${API_BASE}${uploadData.url}`;
+            url = `/api/files/${uploadData.filename}`;
           }
           if (!url) continue;
           allResources.push({
