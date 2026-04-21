@@ -1,7 +1,7 @@
 "use client";
 
 import React, { use } from "react";
-import { ArrowLeft, BookOpen, Calculator, CheckCircle2, Play, FileText, Calendar } from "lucide-react";
+import { ArrowLeft, BookOpen, Calculator, CheckCircle2, Play, FileText, Calendar, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -48,15 +48,20 @@ function parseDates(course: Course): ExamDates {
     };
 }
 
+type BookNoteEntry =
+    | { type: 'single'; title: string; href: string }
+    | { type: 'list'; groupTitle: string; items: { title: string; href: string }[] };
+
 function groupResources(resources: Resource[]) {
     const videos: { title: string; href: string }[] = [];
-    const booksAndNotes: { title: string; href: string }[] = [];
+    const booksAndNotes: BookNoteEntry[] = [];
     const oldExams: {
         major1: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
         major2: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
         final: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
     } = { major1: {}, major2: {}, final: {} };
     const other: { title: string; href: string }[] = [];
+    const listGroups: Record<string, { title: string; href: string }[]> = {};
 
     resources.forEach(r => {
         const item = { title: r.resource_title, href: r.url };
@@ -66,13 +71,17 @@ function groupResources(resources: Resource[]) {
         if (subCat === 'videos' || cat === 'lecture') {
             videos.push(item);
         } else if (subCat === 'books & notes' || cat === 'material') {
-            booksAndNotes.push(item);
-        } else if (subCat === 'old exams' || cat === 'exam') {
-            // Determine exam type from title or sub_category
-            let examType = 'major1'; // default
-            const title = r.resource_title.toLowerCase();
-            if (title.includes('major 2') || title.includes('midterm 2')) examType = 'major2';
-            else if (title.includes('final')) examType = 'final';
+            if (r.unit) {
+                if (!listGroups[r.unit]) listGroups[r.unit] = [];
+                listGroups[r.unit].push(item);
+            } else {
+                booksAndNotes.push({ type: 'single', ...item });
+            }
+        } else if (cat === 'exam') {
+            let examType = 'major1';
+            const subCatLower = r.sub_category?.toLowerCase() ?? '';
+            if (subCatLower.includes('major 2') || subCatLower.includes('major2')) examType = 'major2';
+            else if (subCatLower.includes('final')) examType = 'final';
 
             const semester = r.semester || 'Unknown Semester';
             const chapter = r.chapter || 'General';
@@ -87,6 +96,10 @@ function groupResources(resources: Resource[]) {
         } else {
             other.push(item);
         }
+    });
+
+    Object.entries(listGroups).forEach(([groupTitle, items]) => {
+        booksAndNotes.push({ type: 'list', groupTitle, items });
     });
 
     return { videos, booksAndNotes, oldExams, other };
@@ -228,10 +241,12 @@ function VideosSection({ items }: { items: { title: string; href: string }[] }) 
     );
 }
 
-function BooksAndNotesSection({ items }: { items: { title: string; href: string }[] }) {
+function BooksAndNotesSection({ items }: { items: BookNoteEntry[] }) {
+    const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({});
     if (!items || items.length === 0) return null;
+
     return (
-        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/10 dark:border-white/20 transition-colors h-full flex flex-col">
+        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 transition-colors h-full flex flex-col">
             <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
                     <BookOpen className="w-5 h-5 text-neon-blue" />
@@ -239,11 +254,36 @@ function BooksAndNotesSection({ items }: { items: { title: string; href: string 
                 <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">Books & Notes</h3>
             </div>
             <div className="flex flex-col gap-3">
-                {items.map((item, i) => (
-                    <a key={i} href={item.href} className="group p-4 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-black/10 dark:border-white/10 transition-all flex items-center justify-between">
-                        <span className="text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:text-white transition-colors text-sm">{item.title}</span>
-                        <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue opacity-0 group-hover:opacity-100 transition-all" />
+                {items.map((entry, i) => entry.type === 'single' ? (
+                    <a key={i} href={entry.href} className="group flex items-center justify-between px-4 py-3 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-neon-blue/30 transition-all">
+                        <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{entry.title}</span>
+                        <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
                     </a>
+                ) : (
+                    <div key={i} className="rounded-xl border border-neon-blue/20 overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setOpenGroups(prev => ({ ...prev, [i]: !prev[i] }))}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-neon-blue/5 hover:bg-neon-blue/10 transition-colors"
+                        >
+                            <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white/90">
+                                <BookOpen className="w-4 h-4 text-neon-blue" />
+                                {entry.groupTitle}
+                                <span className="text-xs font-normal text-gray-400 dark:text-white/30 font-mono">{entry.items.length} files</span>
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-neon-blue transition-transform duration-200 ${openGroups[i] ? "rotate-180" : ""}`} />
+                        </button>
+                        {openGroups[i] && (
+                            <div className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
+                                {entry.items.map((item, j) => (
+                                    <a key={j} href={item.href} className="group flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                        <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{item.title}</span>
+                                        <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 ))}
             </div>
         </div>
@@ -387,7 +427,7 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
   const decodedId = decodeURIComponent(courseId);
 
   const [course, setCourse] = useState<Course | null>(null);
-  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; booksAndNotes: {title:string;href:string}[]; oldExams: {major1:{[k:string]:{[k:string]:{title:string;href:string}[]}}; major2:{[k:string]:{[k:string]:{title:string;href:string}[]}}; final:{[k:string]:{[k:string]:{title:string;href:string}[]}}}; other: {title:string;href:string}[] }>({ videos: [], booksAndNotes: [], oldExams: {major1:{},major2:{},final:{}}, other: [] });
+  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; booksAndNotes: BookNoteEntry[]; oldExams: {major1:{[k:string]:{[k:string]:{title:string;href:string}[]}}; major2:{[k:string]:{[k:string]:{title:string;href:string}[]}}; final:{[k:string]:{[k:string]:{title:string;href:string}[]}}}; other: {title:string;href:string}[] }>({ videos: [], booksAndNotes: [], oldExams: {major1:{},major2:{},final:{}}, other: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

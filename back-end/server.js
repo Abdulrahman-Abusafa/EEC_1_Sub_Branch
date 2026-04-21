@@ -41,6 +41,21 @@ redisClient.on("error", (err) => {
     }
 })();
 
+// ─── DB Migrations ────────────────────────────────────────────────────────────
+(async () => {
+    try {
+        await pool.query(`
+            ALTER TABLE resources ADD COLUMN IF NOT EXISTS sub_category TEXT;
+            ALTER TABLE resources ADD COLUMN IF NOT EXISTS semester TEXT;
+            ALTER TABLE resources ADD COLUMN IF NOT EXISTS chapter TEXT;
+            ALTER TABLE resources ADD COLUMN IF NOT EXISTS unit TEXT;
+        `);
+        console.log("✓ DB migrations applied");
+    } catch (err) {
+        console.error("DB migration error:", err.message);
+    }
+})();
+
 // Helper functions for optional redis usage
 async function getCache(key) {
     if (!isRedisConnected) return null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown } from "lucide-react";
 import { fetchCourseResources, createResource, deleteResource, Resource } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -40,8 +40,11 @@ export default function CoursesAdmin() {
 
   // Resources State - restructured for bulk management
   const [videos, setVideos] = useState<{ title: string; url: string }[]>([]);
-  type BookNoteItem = { title: string; url: string; file?: File };
-  const [booksAndNotes, setBooksAndNotes] = useState<BookNoteItem[]>([]);
+  type SingleBookNote = { type: 'single'; title: string; url: string; file?: File };
+  type ListBookNote  = { type: 'list'; groupTitle: string; items: { title: string; url: string; file?: File }[] };
+  type BookNoteEntry = SingleBookNote | ListBookNote;
+  const [booksAndNotes, setBooksAndNotes] = useState<BookNoteEntry[]>([]);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<number, boolean>>({});
   type ExamItem = { term: string; url: string; file?: File };
   const [oldExams, setOldExams] = useState<{
     major1: ExamItem[];
@@ -76,14 +79,20 @@ export default function CoursesAdmin() {
     try {
       const resourcesData = await fetchCourseResources(courseId);
       const videosList: { title: string; url: string }[] = [];
-      const booksAndNotesList: { title: string; url: string }[] = [];
+      const booksAndNotesEntries: BookNoteEntry[] = [];
       const examsData: { major1: ExamItem[]; major2: ExamItem[]; final: ExamItem[] } = { major1: [], major2: [], final: [] };
+      const listGroups: Record<string, { title: string; url: string }[]> = {};
 
       resourcesData.forEach(resource => {
         if (resource.sub_category === 'Videos') {
           videosList.push({ title: resource.resource_title, url: resource.url });
         } else if (resource.sub_category === 'Books & Notes') {
-          booksAndNotesList.push({ title: resource.resource_title, url: resource.url });
+          if (resource.unit) {
+            if (!listGroups[resource.unit]) listGroups[resource.unit] = [];
+            listGroups[resource.unit].push({ title: resource.resource_title, url: resource.url });
+          } else {
+            booksAndNotesEntries.push({ type: 'single', title: resource.resource_title, url: resource.url });
+          }
         } else if (resource.sub_category === 'Major 1') {
           examsData.major1.push({ term: resource.semester || '', url: resource.url });
         } else if (resource.sub_category === 'Major 2') {
@@ -93,8 +102,12 @@ export default function CoursesAdmin() {
         }
       });
 
+      Object.entries(listGroups).forEach(([groupTitle, items]) => {
+        booksAndNotesEntries.push({ type: 'list', groupTitle, items });
+      });
+
       setVideos(videosList);
-      setBooksAndNotes(booksAndNotesList);
+      setBooksAndNotes(booksAndNotesEntries);
       setOldExams(examsData);
     } catch (e) {
       console.error(e);
@@ -273,24 +286,34 @@ export default function CoursesAdmin() {
       });
 
       // Add books and notes — upload any new PDF files first
-      for (const item of booksAndNotes) {
-        let url = item.url;
-        if (item.file) {
-          const formData = new FormData();
-          formData.append('file', item.file);
-          const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
-          if (!uploadRes.ok) throw new Error('Books & Notes PDF upload failed');
-          const uploadData = await uploadRes.json();
-          url = `/api/files/${uploadData.filename}`;
+      for (const entry of booksAndNotes) {
+        if (entry.type === 'single') {
+          let url = entry.url;
+          if (entry.file) {
+            const formData = new FormData();
+            formData.append('file', entry.file);
+            const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
+            if (!uploadRes.ok) throw new Error('Books & Notes PDF upload failed');
+            const uploadData = await uploadRes.json();
+            url = `/api/files/${uploadData.filename}`;
+          }
+          if (!url) continue;
+          allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Material', sub_category: 'Books & Notes' });
+        } else {
+          for (const item of entry.items) {
+            let url = item.url;
+            if (item.file) {
+              const formData = new FormData();
+              formData.append('file', item.file);
+              const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
+              if (!uploadRes.ok) throw new Error('Books & Notes PDF upload failed');
+              const uploadData = await uploadRes.json();
+              url = `/api/files/${uploadData.filename}`;
+            }
+            if (!url) continue;
+            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Material', sub_category: 'Books & Notes', unit: entry.groupTitle });
+          }
         }
-        if (!url) continue;
-        allResources.push({
-          course_id: courseId,
-          resource_title: item.title,
-          url,
-          category: 'Material',
-          sub_category: 'Books & Notes'
-        });
       }
 
       // Add old exams — upload any new PDF files first
@@ -505,66 +528,173 @@ export default function CoursesAdmin() {
 
                     {/* Books & Notes Section */}
                     <div className="mb-6">
-                      <div className="flex justify-between items-center mb-4">
+                      <div className="flex justify-between items-center mb-3">
                         <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                           <BookOpen size={16} className="text-neon-blue" />
                           Books & Notes Section
                         </h4>
-                        <button
-                          type="button"
-                          onClick={() => setBooksAndNotes([...booksAndNotes, { title: "", url: "", file: undefined }])}
-                          className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-300 px-3 py-1 rounded"
-                        >
-                          Add Resource
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Add multiple PDF files in order: First PDF → Main textbook, Second PDF → Professor's notes, etc.</p>
-                      {booksAndNotes.map((item, i) => (
-                        <div key={i} className="flex items-center gap-3 mb-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
-                          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 w-8">{i + 1}.</span>
-                          <div className="flex-1">
-                            <input
-                              type="text"
-                              placeholder={`Resource ${i + 1} (e.g., ${i === 0 ? 'Main Textbook' : i === 1 ? 'Dr. Smith Notes' : 'Additional Notes'})`}
-                              value={item.title}
-                              onChange={(e) => {
-                                const newItems = [...booksAndNotes];
-                                newItems[i].title = e.target.value;
-                                setBooksAndNotes(newItems);
-                              }}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            {item.url && !item.file ? (
-                              <span className="text-xs text-green-500">Uploaded</span>
-                            ) : (
-                              <input
-                                type="file"
-                                accept="application/pdf"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  const newItems = [...booksAndNotes];
-                                  newItems[i] = { ...newItems[i], file };
-                                  setBooksAndNotes(newItems);
-                                }}
-                                className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
-                              />
-                            )}
-                          </div>
+                        <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => setBooksAndNotes(booksAndNotes.filter((_, idx) => idx !== i))}
-                            className="text-red-500 p-2 hover:bg-red-500/10 rounded"
+                            onClick={() => setBooksAndNotes([...booksAndNotes, { type: 'single', title: '', url: '', file: undefined }])}
+                            className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-300 px-3 py-1.5 rounded-lg transition-colors"
                           >
-                            <X size={16} />
+                            <FileText size={13} /> Add Single
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setBooksAndNotes([...booksAndNotes, { type: 'list', groupTitle: '', items: [{ title: '', url: '' }] }])}
+                            className="flex items-center gap-1.5 text-xs bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue px-3 py-1.5 rounded-lg border border-neon-blue/20 transition-colors"
+                          >
+                            <Layers size={13} /> Add List
                           </button>
                         </div>
-                      ))}
-                      {booksAndNotes.length === 0 && (
-                        <p className="text-sm text-gray-400 dark:text-gray-500 italic">No books or notes added yet</p>
-                      )}
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        {booksAndNotes.length === 0 && (
+                          <p className="text-sm text-gray-400 dark:text-gray-500 italic py-2">No books or notes added yet</p>
+                        )}
+
+                        {booksAndNotes.map((entry, i) => entry.type === 'single' ? (
+                          // ── Single Item ──
+                          <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 rounded-lg">
+                            <FileText size={15} className="text-gray-400 dark:text-white/30 flex-shrink-0" />
+                            <div className="flex-1">
+                              <input
+                                type="text"
+                                placeholder="Title (e.g. Main Textbook)"
+                                value={entry.title}
+                                onChange={(e) => {
+                                  const next = [...booksAndNotes];
+                                  (next[i] as SingleBookNote).title = e.target.value;
+                                  setBooksAndNotes(next);
+                                }}
+                                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              {entry.url && !entry.file ? (
+                                <span className="text-xs text-green-500 flex items-center gap-1">✓ Uploaded</span>
+                              ) : (
+                                <input
+                                  type="file"
+                                  accept="application/pdf"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const next = [...booksAndNotes];
+                                    next[i] = { ...(next[i] as SingleBookNote), file };
+                                    setBooksAndNotes(next);
+                                  }}
+                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                />
+                              )}
+                            </div>
+                            <button type="button" onClick={() => setBooksAndNotes(booksAndNotes.filter((_, idx) => idx !== i))} className="text-red-500 p-1.5 hover:bg-red-500/10 rounded flex-shrink-0">
+                              <X size={15} />
+                            </button>
+                          </div>
+                        ) : (
+                          // ── List Group ──
+                          <div key={i} className="border border-neon-blue/20 rounded-xl overflow-hidden">
+                            {/* Group Header */}
+                            <div className="flex items-center gap-3 px-4 py-3 bg-neon-blue/5 border-b border-neon-blue/10">
+                              <Layers size={15} className="text-neon-blue flex-shrink-0" />
+                              <input
+                                type="text"
+                                placeholder="List title (e.g. Lecture Slides)"
+                                value={entry.groupTitle}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setBooksAndNotes(prev => prev.map((en, idx) =>
+                                    idx === i ? { ...(en as ListBookNote), groupTitle: val } : en
+                                  ));
+                                }}
+                                className="flex-1 px-3 py-1.5 text-sm font-medium border border-transparent focus:border-neon-blue/40 rounded bg-transparent dark:text-white outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setCollapsedGroups(prev => ({ ...prev, [i]: !prev[i] }))}
+                                className="p-1.5 hover:bg-neon-blue/10 rounded text-neon-blue flex-shrink-0"
+                              >
+                                <ChevronDown size={15} className={`transition-transform duration-200 ${collapsedGroups[i] ? "-rotate-90" : ""}`} />
+                              </button>
+                              <button type="button" onClick={() => setBooksAndNotes(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 p-1.5 hover:bg-red-500/10 rounded flex-shrink-0">
+                                <X size={15} />
+                              </button>
+                            </div>
+
+                            {/* List Items */}
+                            <div className={`p-3 flex flex-col gap-2 ${collapsedGroups[i] ? "hidden" : ""}`}>
+                              {entry.items.map((item, j) => (
+                                <div key={j} className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                  <span className="text-xs font-mono text-gray-400 dark:text-white/30 w-5 text-center">{j + 1}</span>
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      placeholder={`Item ${j + 1} title`}
+                                      value={item.title}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setBooksAndNotes(prev => prev.map((en, idx) => {
+                                          if (idx !== i) return en;
+                                          const l = en as ListBookNote;
+                                          return { ...l, items: l.items.map((it, jdx) => jdx === j ? { ...it, title: val } : it) };
+                                        }));
+                                      }}
+                                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                                    />
+                                  </div>
+                                  <div className="flex-1">
+                                    {item.url && !item.file ? (
+                                      <span className="text-xs text-green-500">✓ Uploaded</span>
+                                    ) : (
+                                      <input
+                                        type="file"
+                                        accept="application/pdf"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (!file) return;
+                                          setBooksAndNotes(prev => prev.map((en, idx) => {
+                                            if (idx !== i) return en;
+                                            const l = en as ListBookNote;
+                                            return { ...l, items: l.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
+                                          }));
+                                        }}
+                                        className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                      />
+                                    )}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setBooksAndNotes(prev => prev.map((en, idx) => {
+                                      if (idx !== i) return en;
+                                      const l = en as ListBookNote;
+                                      return { ...l, items: l.items.filter((_, jdx) => jdx !== j) };
+                                    }))}
+                                    className="text-red-500 p-1 hover:bg-red-500/10 rounded flex-shrink-0"
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                </div>
+                              ))}
+
+                              <button
+                                type="button"
+                                onClick={() => setBooksAndNotes(prev => prev.map((en, idx) => {
+                                  if (idx !== i) return en;
+                                  const l = en as ListBookNote;
+                                  return { ...l, items: [...l.items, { title: '', url: '' }] };
+                                }))}
+                                className="mt-1 flex items-center gap-1.5 text-xs text-neon-blue hover:text-neon-blue/80 px-2 py-1.5 rounded transition-colors self-start"
+                              >
+                                <Plus size={13} /> Add Item
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Old Exams Section */}
