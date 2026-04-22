@@ -46,11 +46,10 @@ export default function CoursesAdmin() {
   const [booksAndNotes, setBooksAndNotes] = useState<BookNoteEntry[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<number, boolean>>({});
   type ExamItem = { term: string; url: string; file?: File };
-  const [oldExams, setOldExams] = useState<{
-    major1: ExamItem[];
-    major2: ExamItem[];
-    final: ExamItem[];
-  }>({ major1: [], major2: [], final: [] });
+  type ChapterItem = { chapterName: string; url: string; file?: File };
+  const [oldExams, setOldExams] = useState<{ major1: ExamItem[]; major2: ExamItem[]; final: ExamItem[] }>({ major1: [], major2: [], final: [] });
+  const [byChapter, setByChapter] = useState<ChapterItem[]>([]);
+  const [collapsedExams, setCollapsedExams] = useState<Record<string, boolean>>({ major1: true, major2: true, final: true, byChapter: true });
 
   const fetchCourses = async () => {
     try {
@@ -81,6 +80,7 @@ export default function CoursesAdmin() {
       const videosList: { title: string; url: string }[] = [];
       const booksAndNotesEntries: BookNoteEntry[] = [];
       const examsData: { major1: ExamItem[]; major2: ExamItem[]; final: ExamItem[] } = { major1: [], major2: [], final: [] };
+      const byChapterEntries: ChapterItem[] = [];
       const listGroups: Record<string, { title: string; url: string }[]> = {};
 
       resourcesData.forEach(resource => {
@@ -99,6 +99,8 @@ export default function CoursesAdmin() {
           examsData.major2.push({ term: resource.semester || '', url: resource.url });
         } else if (resource.sub_category === 'Final') {
           examsData.final.push({ term: resource.semester || '', url: resource.url });
+        } else if (resource.sub_category === 'Chapter') {
+          byChapterEntries.push({ chapterName: resource.chapter || resource.resource_title, url: resource.url });
         }
       });
 
@@ -109,6 +111,7 @@ export default function CoursesAdmin() {
       setVideos(videosList);
       setBooksAndNotes(booksAndNotesEntries);
       setOldExams(examsData);
+      setByChapter(byChapterEntries);
     } catch (e) {
       console.error(e);
     }
@@ -131,6 +134,7 @@ export default function CoursesAdmin() {
     setVideos([]);
     setBooksAndNotes([]);
     setOldExams({ major1: [], major2: [], final: [] });
+    setByChapter([]);
     setEditingCourseId(null);
   };
 
@@ -330,15 +334,23 @@ export default function CoursesAdmin() {
             url = `/api/files/${uploadData.filename}`;
           }
           if (!url) continue;
-          allResources.push({
-            course_id: courseId,
-            resource_title: `${examLabels[key]} Exam - ${item.term}`,
-            url,
-            category: 'Exam',
-            sub_category: examLabels[key],
-            semester: item.term,
-          });
+          allResources.push({ course_id: courseId, resource_title: `${examLabels[key]} Exam - ${item.term}`, url, category: 'Exam', sub_category: examLabels[key], semester: item.term });
         }
+      }
+
+      // Add by-chapter items
+      for (const item of byChapter) {
+        let url = item.url;
+        if (item.file) {
+          const formData = new FormData();
+          formData.append('file', item.file);
+          const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
+          if (!uploadRes.ok) throw new Error('Chapter PDF upload failed');
+          const uploadData = await uploadRes.json();
+          url = `/api/files/${uploadData.filename}`;
+        }
+        if (!url) continue;
+        allResources.push({ course_id: courseId, resource_title: item.chapterName, url, category: 'Exam', sub_category: 'Chapter', chapter: item.chapterName });
       }
 
       // Save all resources
@@ -707,61 +719,65 @@ export default function CoursesAdmin() {
                       {(['major1', 'major2', 'final'] as const).map((examType) => {
                         const label = examType === 'major1' ? 'Major 1' : examType === 'major2' ? 'Major 2' : 'Final';
                         const items = oldExams[examType];
+                        const isOpen = !collapsedExams[examType];
                         return (
-                          <div key={examType} className="mb-4 p-4 border border-gray-200 dark:border-zinc-700 rounded-lg">
-                            <div className="flex justify-between items-center mb-3">
-                              <h5 className="font-medium text-gray-800 dark:text-gray-200">{label} Exams</h5>
+                          <div key={examType} className="mb-3 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden">
+                            {/* Collapsible Header */}
+                            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-zinc-800/50">
                               <button
                                 type="button"
-                                onClick={() => setOldExams(prev => ({ ...prev, [examType]: [...prev[examType], { term: '', url: '' }] }))}
-                                className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-300 px-3 py-1 rounded"
+                                onClick={() => setCollapsedExams(prev => ({ ...prev, [examType]: !prev[examType] }))}
+                                className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 flex-1 text-left"
                               >
-                                + Add Exam
+                                <ChevronDown size={15} className={`text-neon-blue transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                                {label} Exams
+                                {items.length > 0 && <span className="text-xs font-mono text-gray-400 dark:text-white/30">{items.length} files</span>}
                               </button>
+                              {isOpen && (
+                                <button
+                                  type="button"
+                                  onClick={() => setOldExams(prev => ({ ...prev, [examType]: [...prev[examType], { term: '', url: '' }] }))}
+                                  className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg"
+                                >
+                                  + Add
+                                </button>
+                              )}
                             </div>
 
-                            {items.length === 0 ? (
-                              <p className="text-sm text-gray-400 dark:text-gray-500 italic">No exams added yet</p>
-                            ) : (
-                              <div className="flex flex-col gap-2">
+                            {/* Items */}
+                            {isOpen && (
+                              <div className="p-3 flex flex-col gap-2">
+                                {items.length === 0 && (
+                                  <p className="text-sm text-gray-400 dark:text-gray-500 italic px-1">No exams added yet</p>
+                                )}
                                 {items.map((item, i) => (
                                   <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
-                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400 w-6 shrink-0">{i + 1}.</span>
                                     <input
                                       type="text"
-                                      placeholder="Term (e.g. 241, 242, 251)"
+                                      placeholder="Term (e.g. 241)"
                                       value={item.term}
                                       onChange={(e) => {
-                                        const updated = [...items];
-                                        updated[i] = { ...updated[i], term: e.target.value };
-                                        setOldExams(prev => ({ ...prev, [examType]: updated }));
+                                        const val = e.target.value;
+                                        setOldExams(prev => ({ ...prev, [examType]: prev[examType].map((it, idx) => idx === i ? { ...it, term: val } : it) }));
                                       }}
-                                      className="w-36 shrink-0 px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                                      className="w-40 shrink-0 px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
                                     />
                                     <div className="flex-1">
                                       {item.url && !item.file ? (
-                                        <span className="text-xs text-green-500">Uploaded</span>
+                                        <span className="text-xs text-green-500">✓ Uploaded</span>
                                       ) : (
-                                        <input
-                                          type="file"
-                                          accept="application/pdf"
+                                        <input type="file" accept="application/pdf"
                                           onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
-                                            const updated = [...items];
-                                            updated[i] = { ...updated[i], file };
-                                            setOldExams(prev => ({ ...prev, [examType]: updated }));
+                                            setOldExams(prev => ({ ...prev, [examType]: prev[examType].map((it, idx) => idx === i ? { ...it, file } : it) }));
                                           }}
                                           className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
                                         />
                                       )}
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => setOldExams(prev => ({ ...prev, [examType]: prev[examType].filter((_, idx) => idx !== i) }))}
-                                      className="text-red-500 p-1 hover:bg-red-500/10 rounded shrink-0"
-                                    >
-                                      <X size={16} />
+                                    <button type="button" onClick={() => setOldExams(prev => ({ ...prev, [examType]: prev[examType].filter((_, idx) => idx !== i) }))} className="text-red-500 p-1 hover:bg-red-500/10 rounded shrink-0">
+                                      <X size={15} />
                                     </button>
                                   </div>
                                 ))}
@@ -770,6 +786,50 @@ export default function CoursesAdmin() {
                           </div>
                         );
                       })}
+
+                      {/* By Chapter Section */}
+                      <div className="mb-3 border border-neon-blue/20 rounded-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 bg-neon-blue/5">
+                          <button type="button" onClick={() => setCollapsedExams(prev => ({ ...prev, byChapter: !prev.byChapter }))}
+                            className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 flex-1 text-left">
+                            <ChevronDown size={15} className={`text-neon-blue transition-transform duration-200 ${!collapsedExams.byChapter ? 'rotate-180' : ''}`} />
+                            By Chapter
+                            {byChapter.length > 0 && <span className="text-xs font-mono text-gray-400 dark:text-white/30">{byChapter.length} files</span>}
+                          </button>
+                          {!collapsedExams.byChapter && (
+                            <button type="button" onClick={() => setByChapter(prev => [...prev, { chapterName: '', url: '' }])}
+                              className="text-xs bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue border border-neon-blue/20 px-3 py-1.5 rounded-lg">
+                              + Add
+                            </button>
+                          )}
+                        </div>
+                        {!collapsedExams.byChapter && (
+                          <div className="p-3 flex flex-col gap-2">
+                            {byChapter.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 italic px-1">No chapters added yet</p>}
+                            {byChapter.map((item, i) => (
+                              <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                <input type="text" placeholder="Chapter name" value={item.chapterName}
+                                  onChange={(e) => { const val = e.target.value; setByChapter(prev => prev.map((it, idx) => idx === i ? { ...it, chapterName: val } : it)); }}
+                                  className="w-40 shrink-0 px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                                />
+                                <div className="flex-1">
+                                  {item.url && !item.file ? (
+                                    <span className="text-xs text-green-500">✓ Uploaded</span>
+                                  ) : (
+                                    <input type="file" accept="application/pdf"
+                                      onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setByChapter(prev => prev.map((it, idx) => idx === i ? { ...it, file } : it)); }}
+                                      className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                    />
+                                  )}
+                                </div>
+                                <button type="button" onClick={() => setByChapter(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 p-1 hover:bg-red-500/10 rounded shrink-0">
+                                  <X size={15} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 

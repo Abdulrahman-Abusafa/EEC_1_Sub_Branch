@@ -56,10 +56,11 @@ function groupResources(resources: Resource[]) {
     const videos: { title: string; href: string }[] = [];
     const booksAndNotes: BookNoteEntry[] = [];
     const oldExams: {
-        major1: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
-        major2: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
-        final: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
+        major1: { [semester: string]: { title: string; href: string }[] };
+        major2: { [semester: string]: { title: string; href: string }[] };
+        final: { [semester: string]: { title: string; href: string }[] };
     } = { major1: {}, major2: {}, final: {} };
+    const byChapter: { title: string; href: string }[] = [];
     const other: { title: string; href: string }[] = [];
     const listGroups: Record<string, { title: string; href: string }[]> = {};
 
@@ -77,22 +78,17 @@ function groupResources(resources: Resource[]) {
             } else {
                 booksAndNotes.push({ type: 'single', ...item });
             }
+        } else if (subCat === 'chapter') {
+            byChapter.push(item);
         } else if (cat === 'exam') {
-            let examType = 'major1';
+            let examType: 'major1' | 'major2' | 'final' = 'major1';
             const subCatLower = r.sub_category?.toLowerCase() ?? '';
             if (subCatLower.includes('major 2') || subCatLower.includes('major2')) examType = 'major2';
             else if (subCatLower.includes('final')) examType = 'final';
 
             const semester = r.semester || 'Unknown Semester';
-            const chapter = r.chapter || 'General';
-
-            if (!oldExams[examType as keyof typeof oldExams][semester]) {
-                oldExams[examType as keyof typeof oldExams][semester] = {};
-            }
-            if (!oldExams[examType as keyof typeof oldExams][semester][chapter]) {
-                oldExams[examType as keyof typeof oldExams][semester][chapter] = [];
-            }
-            oldExams[examType as keyof typeof oldExams][semester][chapter].push(item);
+            if (!oldExams[examType][semester]) oldExams[examType][semester] = [];
+            oldExams[examType][semester].push(item);
         } else {
             other.push(item);
         }
@@ -102,7 +98,7 @@ function groupResources(resources: Resource[]) {
         booksAndNotes.push({ type: 'list', groupTitle, items });
     });
 
-    return { videos, booksAndNotes, oldExams, other };
+    return { videos, booksAndNotes, oldExams, byChapter, other };
 }
 
 
@@ -186,6 +182,8 @@ function OtherResourcesSection({ title, items, icon: Icon }: { title: string, it
                     <a
                         key={i}
                         href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
                         className="group flex items-center gap-2 px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 hover:border-neon-blue/40 hover:bg-black/8 dark:hover:bg-white/[0.07] transition-all text-sm text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white truncate"
                     >
                         <span className="w-1.5 h-1.5 rounded-full bg-neon-blue/50 group-hover:bg-neon-blue flex-shrink-0 transition-colors" />
@@ -209,7 +207,7 @@ function ContentSection({ title, items, icon: Icon }: { title: string, items: { 
             </div>
             <div className="flex flex-col gap-3">
                 {items.map((item, i) => (
-                    <a key={i} href={item.href} className="group p-4 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-black/10 dark:border-white/10 transition-all flex items-center justify-between">
+                    <a key={i} href={item.href} target="_blank" rel="noreferrer" className="group p-4 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-black/10 dark:border-white/10 transition-all flex items-center justify-between">
                         <span className="text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:text-white transition-colors text-sm">{item.title}</span>
                         <Play className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue opacity-0 group-hover:opacity-100 transition-all" />
                     </a>
@@ -231,7 +229,7 @@ function VideosSection({ items }: { items: { title: string; href: string }[] }) 
             </div>
             <div className="flex flex-col gap-3">
                 {items.map((item, i) => (
-                    <a key={i} href={item.href} className="group p-4 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-black/10 dark:border-white/10 transition-all flex items-center justify-between">
+                    <a key={i} href={item.href} target="_blank" rel="noreferrer" className="group p-4 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-black/10 dark:border-white/10 transition-all flex items-center justify-between">
                         <span className="text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:text-white transition-colors text-sm">{item.title}</span>
                         <Play className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue opacity-0 group-hover:opacity-100 transition-all" />
                     </a>
@@ -255,7 +253,7 @@ function BooksAndNotesSection({ items }: { items: BookNoteEntry[] }) {
             </div>
             <div className="flex flex-col gap-3">
                 {items.map((entry, i) => entry.type === 'single' ? (
-                    <a key={i} href={entry.href} className="group flex items-center justify-between px-4 py-3 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-neon-blue/30 transition-all">
+                    <a key={i} href={entry.href} target="_blank" rel="noreferrer" className="group flex items-center justify-between px-4 py-3 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-neon-blue/30 transition-all">
                         <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{entry.title}</span>
                         <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
                     </a>
@@ -276,7 +274,7 @@ function BooksAndNotesSection({ items }: { items: BookNoteEntry[] }) {
                         {openGroups[i] && (
                             <div className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
                                 {entry.items.map((item, j) => (
-                                    <a key={j} href={item.href} className="group flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                    <a key={j} href={item.href} target="_blank" rel="noreferrer" className="group flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                                         <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{item.title}</span>
                                         <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
                                     </a>
@@ -290,45 +288,77 @@ function BooksAndNotesSection({ items }: { items: BookNoteEntry[] }) {
     );
 }
 
-function OldExamsSection({ exams }: { exams: { major1: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } }; major2: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } }; final: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } } } }) {
-    const hasExams = Object.values(exams).some(examType => Object.keys(examType).length > 0);
+function OldExamsSection({ exams, byChapter }: { exams: { major1: { [semester: string]: { title: string; href: string }[] }; major2: { [semester: string]: { title: string; href: string }[] }; final: { [semester: string]: { title: string; href: string }[] } }; byChapter: { title: string; href: string }[] }) {
+    const [openTypes, setOpenTypes] = useState<Record<string, boolean>>({});
+    const hasExams = Object.values(exams).some(examType => Object.keys(examType).length > 0) || byChapter.length > 0;
     if (!hasExams) return null;
 
     return (
-        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/10 dark:border-white/20 transition-colors h-full flex flex-col">
+        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 transition-colors h-full flex flex-col">
             <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
                     <Calculator className="w-5 h-5 text-neon-blue" />
                 </div>
                 <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">Old Exams</h3>
             </div>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
                 {Object.entries(exams).map(([examType, semesters]) => {
                     if (Object.keys(semesters).length === 0) return null;
                     const examTitle = examType === 'major1' ? 'Major 1' : examType === 'major2' ? 'Major 2' : 'Final';
+                    const isOpen = !!openTypes[examType];
                     return (
-                        <div key={examType} className="border-l-2 border-neon-blue/20 pl-4">
-                            <h4 className="text-lg font-semibold text-gray-900 dark:text-white/90 mb-2">{examTitle}</h4>
-                            {Object.entries(semesters).map(([semester, chapters]) => (
-                                <div key={semester} className="mb-3">
-                                    <h5 className="text-sm font-medium text-gray-700 dark:text-white/70 mb-1">{semester}</h5>
-                                    {Object.entries(chapters).map(([chapter, items]) => (
-                                        <div key={chapter} className="ml-4 mb-2">
-                                            <span className="text-xs text-gray-500 dark:text-white/50">{chapter}</span>
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                                {items.map((item, i) => (
-                                                    <a key={i} href={item.href} className="text-xs px-2 py-1 rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white">
-                                                        {item.title}
-                                                    </a>
-                                                ))}
-                                            </div>
+                        <div key={examType} className="rounded-xl border border-black/10 dark:border-white/10 overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setOpenTypes(prev => ({ ...prev, [examType]: !prev[examType] }))}
+                                className="w-full flex items-center justify-between px-4 py-3 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] transition-colors"
+                            >
+                                <span className="font-semibold text-gray-900 dark:text-white/90">{examTitle}</span>
+                                <ChevronDown className={`w-4 h-4 text-neon-blue transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isOpen && (
+                                <div className="p-3 flex flex-col gap-2">
+                                    {Object.entries(semesters).map(([semester, items]) => (
+                                        <div key={semester} className="flex flex-wrap items-center gap-2 px-1">
+                                            <span className="text-sm font-medium text-gray-700 dark:text-white/70 mr-1">{semester}</span>
+                                            {items.map((item, i) => (
+                                                <a key={i} href={item.href} target="_blank" rel="noreferrer"
+                                                    className="text-xs px-3 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/5 dark:border-white/5 hover:border-neon-blue/30 transition-colors text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white">
+                                                    {item.title}
+                                                </a>
+                                            ))}
                                         </div>
                                     ))}
                                 </div>
-                            ))}
+                            )}
                         </div>
                     );
                 })}
+
+                {/* By Chapter */}
+                {byChapter.length > 0 && (
+                    <div className="rounded-xl border border-neon-blue/20 overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setOpenTypes(prev => ({ ...prev, byChapter: !prev.byChapter }))}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-neon-blue/5 hover:bg-neon-blue/10 transition-colors"
+                        >
+                            <span className="font-semibold text-gray-900 dark:text-white/90">By Chapter</span>
+                            <ChevronDown className={`w-4 h-4 text-neon-blue transition-transform duration-200 ${openTypes.byChapter ? 'rotate-180' : ''}`} />
+                        </button>
+                        {openTypes.byChapter && (
+                            <div className="p-3 flex flex-col gap-2">
+                                {byChapter.map((item, i) => (
+                                    <a key={i} href={item.href} target="_blank" rel="noreferrer"
+                                        className="flex items-center justify-between px-4 py-3 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/5 dark:border-white/5 hover:border-neon-blue/30 transition-colors group">
+                                        <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{item.title}</span>
+                                        <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -427,7 +457,7 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
   const decodedId = decodeURIComponent(courseId);
 
   const [course, setCourse] = useState<Course | null>(null);
-  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; booksAndNotes: BookNoteEntry[]; oldExams: {major1:{[k:string]:{[k:string]:{title:string;href:string}[]}}; major2:{[k:string]:{[k:string]:{title:string;href:string}[]}}; final:{[k:string]:{[k:string]:{title:string;href:string}[]}}}; other: {title:string;href:string}[] }>({ videos: [], booksAndNotes: [], oldExams: {major1:{},major2:{},final:{}}, other: [] });
+  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; booksAndNotes: BookNoteEntry[]; oldExams: {major1:{[k:string]:{title:string;href:string}[]}; major2:{[k:string]:{title:string;href:string}[]}; final:{[k:string]:{title:string;href:string}[]}}; byChapter: {title:string;href:string}[]; other: {title:string;href:string}[] }>({ videos: [], booksAndNotes: [], oldExams: {major1:{},major2:{},final:{}}, byChapter: [], other: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -574,7 +604,7 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <VideosSection items={data.resources.videos} />
                     <BooksAndNotesSection items={data.resources.booksAndNotes} />
-                    <OldExamsSection exams={data.resources.oldExams} />
+                    <OldExamsSection exams={data.resources.oldExams} byChapter={data.resources.byChapter} />
                     {data.resources.other && data.resources.other.length > 0 && (
                         <div className="md:col-span-2 lg:col-span-3">
                             <OtherResourcesSection
