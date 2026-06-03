@@ -14,8 +14,8 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}) {
   }
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { path: string[] } }) {
-  const path = params?.path;
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const path = (await params)?.path;
   if (!Array.isArray(path) || path.length === 0) {
     return new NextResponse("Invalid file path", { status: 400 });
   }

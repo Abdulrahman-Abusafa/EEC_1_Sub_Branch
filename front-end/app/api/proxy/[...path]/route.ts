@@ -16,30 +16,30 @@ async function fetchWithTimeout(input: RequestInfo, init?: RequestInit) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  return handleProxyRequest("GET", request, params);
+  return handleProxyRequest("GET", request, await params);
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  return handleProxyRequest("POST", request, params);
+  return handleProxyRequest("POST", request, await params);
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  return handleProxyRequest("PUT", request, params);
+  return handleProxyRequest("PUT", request, await params);
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  return handleProxyRequest("DELETE", request, params);
+  return handleProxyRequest("DELETE", request, await params);
 }
 
 async function handleProxyRequest(
