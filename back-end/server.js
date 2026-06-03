@@ -49,6 +49,10 @@ redisClient.on("error", (err) => {
             ALTER TABLE resources ADD COLUMN IF NOT EXISTS semester TEXT;
             ALTER TABLE resources ADD COLUMN IF NOT EXISTS chapter TEXT;
             ALTER TABLE resources ADD COLUMN IF NOT EXISTS unit TEXT;
+            ALTER TABLE courses ADD COLUMN IF NOT EXISTS books TEXT;
+            ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_1_date DATE;
+            ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_2_date DATE;
+            ALTER TABLE courses ADD COLUMN IF NOT EXISTS final_date DATE;
         `);
         console.log("✓ DB migrations applied");
     } catch (err) {
