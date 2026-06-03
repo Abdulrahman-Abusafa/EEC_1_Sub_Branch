@@ -65,8 +65,8 @@ async function handleProxyRequest(
     };
 
     if (method !== "GET" && method !== "DELETE") {
-      const body = await request.text();
-      if (body) {
+      const body = await request.arrayBuffer();
+      if (body.byteLength > 0) {
         options.body = body;
       }
     }
