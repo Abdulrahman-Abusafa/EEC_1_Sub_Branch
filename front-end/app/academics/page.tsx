@@ -13,9 +13,16 @@ export default function AcademicsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchCourses().then(setCourses).finally(() => setLoading(false));
+    fetchCourses()
+      .then(setCourses)
+      .catch((error) => {
+        console.error("Failed to load courses:", error);
+        setLoadError("Unable to load courses at this time. Please refresh the page.");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   // Derive unique sorted levels from API data
@@ -73,6 +80,10 @@ export default function AcademicsPage() {
       {loading ? (
         <div className="flex justify-center py-24">
           <DotLottieReact src="/Charging battery.json" loop autoplay className="w-32 h-32" />
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-24 text-red-500 dark:text-red-400 font-medium">
+          {loadError}
         </div>
       ) : filteredCourses.length === 0 ? (
         <div className="text-center py-24 text-gray-400 dark:text-white/30 font-mono">

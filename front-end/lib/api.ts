@@ -19,6 +19,19 @@ export function getPhotoUrl(photo: ImageAttachment[] | string | null | undefined
 const rawApiBase = process.env.NEXT_PUBLIC_API_URL;
 export const API_BASE = rawApiBase && rawApiBase.startsWith("http") ? "/api/proxy" : rawApiBase || "/api/proxy";
 
+const FETCH_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(input: RequestInfo, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -89,20 +102,20 @@ export type OtherStat = {
 // ─── Exported Fetch Functions ─────────────────────────────────────────────────
 
 export async function fetchEvents(): Promise<Event[]> {
-  const res = await fetch(`${API_BASE}/events`);
+  const res = await fetchWithTimeout(`${API_BASE}/events`);
   if (!res.ok) throw new Error("Failed to fetch events");
   return res.json();
 }
 
 export async function fetchMembers(): Promise<Member[]> {
-  const res = await fetch(`${API_BASE}/members`);
+  const res = await fetchWithTimeout(`${API_BASE}/members`);
   if (!res.ok) throw new Error("Failed to fetch members");
   const members: Member[] = await res.json();
   return members.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
 export async function fetchCourses(): Promise<Course[]> {
-  const res = await fetch(`${API_BASE}/courses`);
+  const res = await fetchWithTimeout(`${API_BASE}/courses`);
   if (!res.ok) throw new Error("Failed to fetch courses");
   const courses: Course[] = await res.json();
   return courses.sort((a, b) => {
@@ -114,13 +127,13 @@ export async function fetchCourses(): Promise<Course[]> {
 }
 
 export async function fetchCourseResources(courseId: string): Promise<Resource[]> {
-  const res = await fetch(`${API_BASE}/resources?courseId=${encodeURIComponent(courseId)}`);
+  const res = await fetchWithTimeout(`${API_BASE}/resources?courseId=${encodeURIComponent(courseId)}`);
   if (!res.ok) throw new Error("Failed to fetch resources");
   return res.json();
 }
 
 export async function fetchOtherStats(): Promise<OtherStat | null> {
-  const res = await fetch(`${API_BASE}/stats`);
+  const res = await fetchWithTimeout(`${API_BASE}/stats`);
   if (!res.ok) throw new Error("Failed to fetch stats");
   return res.json();
 }
@@ -128,7 +141,7 @@ export async function fetchOtherStats(): Promise<OtherStat | null> {
 // ─── Resource CRUD (Express backend) ─────────────────────────────────────────
 
 export async function createResource(resource: Omit<Resource, "id">): Promise<Resource> {
-  const res = await fetch(`${API_BASE}/resources`, {
+  const res = await fetchWithTimeout(`${API_BASE}/resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(resource),
@@ -138,7 +151,7 @@ export async function createResource(resource: Omit<Resource, "id">): Promise<Re
 }
 
 export async function updateResource(id: number, resource: Omit<Resource, "id">): Promise<Resource> {
-  const res = await fetch(`${API_BASE}/resources/${id}`, {
+  const res = await fetchWithTimeout(`${API_BASE}/resources/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(resource),
@@ -148,6 +161,6 @@ export async function updateResource(id: number, resource: Omit<Resource, "id">)
 }
 
 export async function deleteResource(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/resources/${id}`, { method: "DELETE" });
+  const res = await fetchWithTimeout(`${API_BASE}/resources/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete resource");
 }
