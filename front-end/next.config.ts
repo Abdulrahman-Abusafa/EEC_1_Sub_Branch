@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/proxy/:path*",
-        destination: "http://76.13.155.82:4000/:path*",
+        destination: `${process.env.BACKEND_URL || "http://76.13.155.82:4000"}/:path*`,
       },
     ];
   },

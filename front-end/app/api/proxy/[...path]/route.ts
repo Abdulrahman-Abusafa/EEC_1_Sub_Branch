@@ -4,30 +4,34 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:4000";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  return handleProxyRequest("GET", request, params);
+  const { path } = await params;
+  return handleProxyRequest("GET", request, { path });
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  return handleProxyRequest("POST", request, params);
+  const { path } = await params;
+  return handleProxyRequest("POST", request, { path });
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  return handleProxyRequest("PUT", request, params);
+  const { path } = await params;
+  return handleProxyRequest("PUT", request, { path });
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  return handleProxyRequest("DELETE", request, params);
+  const { path } = await params;
+  return handleProxyRequest("DELETE", request, { path });
 }
 
 async function handleProxyRequest(

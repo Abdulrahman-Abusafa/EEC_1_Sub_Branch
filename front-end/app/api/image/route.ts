@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:4000";
+
 export async function GET(request: NextRequest) {
     const token = request.nextUrl.searchParams.get("token");
 
@@ -7,10 +9,7 @@ export async function GET(request: NextRequest) {
         return new NextResponse("Missing token", { status: 400 });
     }
 
-    const apiBase = process.env.NODE_ENV === "production"
-        ? "http://76.13.155.82:4000"
-        : "http://76.13.155.82:4000";
-    const upstream = `${apiBase}/image?token=${encodeURIComponent(token)}`;
+    const upstream = `${BACKEND_URL}/image?token=${encodeURIComponent(token)}`;
 
     try {
         const res = await fetch(upstream, { cache: "no-store" });
