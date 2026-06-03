@@ -62,7 +62,7 @@ export default function EventsAdmin() {
     setTime("");
     setStartDate("");
     setEndDate("");
-    setStatus("upcoming");
+    setStatus("Upcoming");
     setRegistrationLink("");
     setImageFile(null);
     setEditingEvent(null);
