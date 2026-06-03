@@ -123,7 +123,7 @@ export async function fetchOtherStats(): Promise<OtherStat | null> {
 
 // ─── Resource CRUD (Express backend) ─────────────────────────────────────────
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://76.13.155.82:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/proxy";
 
 export async function createResource(resource: Omit<Resource, "id">): Promise<Resource> {
   const res = await fetch(`${API_BASE}/resources`, {

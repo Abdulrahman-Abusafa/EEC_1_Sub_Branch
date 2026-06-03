@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://76.13.155.82:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/proxy";
 import { Users, Calendar, BookOpen, Activity } from "lucide-react";
 
 export default function AdminDashboard() {
