@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND = process.env.NODE_ENV === "production"
     ? "http://76.13.155.82:4000"
-    : "http://localhost:4000";
+    : "http://76.13.155.82:4000";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;

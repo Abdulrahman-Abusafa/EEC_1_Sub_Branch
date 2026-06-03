@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown } from "lucide-react";
 import { fetchCourseResources, createResource, deleteResource, Resource } from "@/lib/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://76.13.155.82:4000";
 
 type BookItem = { title: string; url: string; file?: File };
 
