@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/proxy";
 import { Users, Calendar, BookOpen, Activity } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({

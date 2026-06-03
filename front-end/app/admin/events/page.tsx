@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/proxy";
 import { Plus, Edit2, Trash2, X, Link as LinkIcon, CalendarDays } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 type Event = {
   id: number;

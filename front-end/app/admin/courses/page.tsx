@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown } from "lucide-react";
-import { fetchCourseResources, createResource, deleteResource, Resource } from "@/lib/api";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/proxy";
+import { fetchCourseResources, createResource, deleteResource, Resource, API_BASE } from "@/lib/api";
 
 type BookItem = { title: string; url: string; file?: File };
 
