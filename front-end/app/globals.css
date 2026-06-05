@@ -3,18 +3,29 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #020617;
-  --foreground: #ffffff;
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #111827;
+  --surface: rgba(255, 255, 255, 0.86);
+  --muted: #475569;
+  --border: rgba(148, 163, 184, 0.24);
   --neon-blue: #06b6d4;
   --electric-purple: #a855f7;
-  --x: 50%;
-  --y: 50%;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #111827;
+  --foreground: #e2e8f0;
+  --surface: rgba(15, 23, 42, 0.88);
+  --muted: #94a3b8;
+  --border: rgba(148, 163, 184, 0.16);
 }
 
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-deep-space: #020617;
+  --color-deep-space: #111827;
   --color-neon-blue: #06b6d4;
   --color-electric-purple: #a855f7;
 
@@ -33,6 +44,15 @@
       transform: translateY(-20px);
     }
   }
+
+  @keyframes theme-spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
 }
 
 html {
@@ -45,6 +65,18 @@ body {
   font-family: var(--font-inter), sans-serif;
   overflow-x: hidden;
   min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+* {
+  scrollbar-color: var(--border) transparent;
+}
+
+::selection {
+  background: rgba(6, 182, 212, 0.18);
+  color: var(--foreground);
 }
 
 @utility glass-panel {
@@ -55,40 +87,47 @@ body {
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(6, 182, 212, 0.3);
 }
 
-/* Disable unwanted transitions during theme switch to prevent double-animation */
-.theme-switching * {
-  transition: none !important;
-  animation-duration: 0ms !important;
+.theme-corner-flare {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99999;
+  opacity: 0;
+  animation: corner-flare-anim 0.4s ease-out forwards;
 }
 
-/* Lock layout during transition to prevent scrollbar-induced shift when zoomed */
-html.theme-switching {
-  overflow: hidden;
+.theme-corner-flare.light {
+  background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 55%);
+  mix-blend-mode: screen;
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-  display: block;
-  height: 100%;
-  width: 100%;
+.theme-corner-flare.dark {
+  background: radial-gradient(circle at top right, rgba(15, 23, 42, 0.96) 0%, rgba(15, 23, 42, 0) 55%);
+  mix-blend-mode: multiply;
 }
 
-::view-transition-new(root) {
-  z-index: 9999;
-  animation: reveal-theme 0.4s ease-out;
-}
-
-::view-transition-old(root) {
-  z-index: 1;
-}
-
-@keyframes reveal-theme {
-  from {
-    clip-path: circle(0% at var(--x) var(--y));
+@keyframes corner-flare-anim {
+  0% {
+    clip-path: circle(0% at top right);
+    opacity: 0.7;
   }
-  to {
-    clip-path: circle(150% at var(--x) var(--y));
+  65% {
+    clip-path: circle(110% at top right);
+    opacity: 0.45;
   }
+  100% {
+    clip-path: circle(110% at top right);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-corner-flare,
+  .animate-spin {
+    animation: none !important;
+  }
+}
+
+.animate-spin {
+  animation: theme-spin 0.6s linear;
 }
