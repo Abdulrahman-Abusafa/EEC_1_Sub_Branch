@@ -415,6 +415,69 @@ app.delete("/events/:id", async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  TERMS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** GET /terms */
+app.get("/terms", async (_req, res) => {
+    try {
+        const { rows } = await pool.query("SELECT * FROM terms ORDER BY id");
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to fetch terms" });
+    }
+});
+
+/** POST /terms — create a term */
+app.post("/terms", async (req, res) => {
+    const { name, is_current } = req.body;
+    if (!name) return res.status(400).json({ error: "name is required" });
+    if (!/^\d{3}-\d{3}$/.test(name)) return res.status(400).json({ error: "Academic year must be in the format XXX-XXX (e.g. 251-252)" });
+    try {
+        if (is_current) {
+            await pool.query("UPDATE terms SET is_current = false");
+        }
+        const { rows } = await pool.query(
+            "INSERT INTO terms (name, is_current) VALUES ($1, $2) RETURNING *",
+            [name, is_current || false]
+        );
+        res.status(201).json(rows[0]);
+    } catch (err) {
+        if (err.code === "23505") return res.status(409).json({ error: "A term with that name already exists" });
+        console.error(err);
+        res.status(500).json({ error: "Failed to create term" });
+    }
+});
+
+/** PATCH /terms/:id/current — mark one term as current, unset all others */
+app.patch("/terms/:id/current", async (req, res) => {
+    try {
+        await pool.query("UPDATE terms SET is_current = false");
+        const { rows } = await pool.query(
+            "UPDATE terms SET is_current = true WHERE id = $1 RETURNING *",
+            [req.params.id]
+        );
+        if (!rows.length) return res.status(404).json({ error: "Term not found" });
+        res.json(rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to update term" });
+    }
+});
+
+/** DELETE /terms/:id */
+app.delete("/terms/:id", async (req, res) => {
+    try {
+        await pool.query("DELETE FROM terms WHERE id = $1", [req.params.id]);
+        res.json({ message: "Deleted" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to delete term" });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  MEMBERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -434,16 +497,16 @@ app.get("/members", async (_req, res) => {
 
 /** POST /members */
 app.post("/members", upload.single("image"), async (req, res) => {
-    const { name, role, linkedin, sort_order, term } = req.body;
+    const { name, role, linkedin, sort_order, term, bio, email, twitter } = req.body;
     let image = null;
     if (req.file) {
         image = JSON.stringify([{ token: req.file.filename, name: req.file.originalname }]);
     }
     try {
         const { rows } = await pool.query(
-            `INSERT INTO members (name, role, linkedin, sort_order, term, image)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-            [name, role, linkedin, sort_order || 0, term || '1', image]
+            `INSERT INTO members (name, role, linkedin, sort_order, term, image, bio, email, twitter)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+            [name, role, linkedin || null, sort_order || 0, term || '1', image, bio || null, email || null, twitter || null]
         );
         res.status(201).json(rows[0]);
     } catch (err) {
@@ -454,10 +517,10 @@ app.post("/members", upload.single("image"), async (req, res) => {
 
 /** PUT /members/:id */
 app.put("/members/:id", upload.single("image"), async (req, res) => {
-    const { name, role, linkedin, sort_order, term } = req.body;
+    const { name, role, linkedin, sort_order, term, bio, email, twitter } = req.body;
     try {
         let imageUpdate = "";
-        const params = [name, role, linkedin, sort_order, term];
+        const params = [name, role, linkedin || null, sort_order, term, bio || null, email || null, twitter || null];
         if (req.file) {
             params.push(JSON.stringify([{ token: req.file.filename, name: req.file.originalname }]));
             imageUpdate = `, image=$${params.length}`;
@@ -465,7 +528,7 @@ app.put("/members/:id", upload.single("image"), async (req, res) => {
         params.push(req.params.id);
         const { rows } = await pool.query(
             `UPDATE members SET name=$1, role=$2, linkedin=$3,
-        sort_order=$4, term=$5${imageUpdate}
+        sort_order=$4, term=$5, bio=$6, email=$7, twitter=$8${imageUpdate}
        WHERE id=$${params.length} RETURNING *`,
             params
         );

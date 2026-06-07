@@ -35,6 +35,13 @@ export async function PUT(
   return handleProxyRequest("PUT", request, await params);
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return handleProxyRequest("PATCH", request, await params);
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }

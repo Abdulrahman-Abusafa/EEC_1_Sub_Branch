@@ -264,7 +264,7 @@ export default function EventsAdmin() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Registration Link (optional)</label>
-                      <input type="url" value={registrationLink} onChange={e => setRegistrationLink(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
+                      <input type="text" value={registrationLink} onChange={e => setRegistrationLink(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" />
                     </div>
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Event Image</label>

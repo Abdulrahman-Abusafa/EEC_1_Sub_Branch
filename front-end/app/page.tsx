@@ -6,7 +6,7 @@ import { ArrowRight, Zap, Calendar, User } from "lucide-react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import React, { useEffect } from "react";
 
-import { fetchEvents, fetchMembers, getPhotoUrl, Event, Member } from "@/lib/api";
+import { fetchEvents, fetchMembers, fetchTerms, getPhotoUrl, Event, Member } from "@/lib/api";
 
 function categoryColor(cat: string) {
     if (cat === "Workshop") return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
@@ -27,9 +27,11 @@ export default function Home() {
             const active = evts.filter(e => e.status?.toLowerCase() !== "ended");
             setSliderEvents([...active, ...active]);
         });
-        fetchMembers().then(members => {
-            const current = members.filter(m => String(m.term).trim() === "current");
-            const pool = current.length > 0 ? current : members;
+        Promise.all([fetchMembers(), fetchTerms()]).then(([allMembers, terms]) => {
+            const currentTerm = terms.find(t => t.is_current);
+            const pool = currentTerm
+                ? allMembers.filter((m: Member) => m.term === currentTerm.name)
+                : allMembers;
             setSliderMembers(pool);
         });
     }, []);

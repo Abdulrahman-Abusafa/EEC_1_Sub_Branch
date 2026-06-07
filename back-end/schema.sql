@@ -59,7 +59,22 @@ CREATE TABLE IF NOT EXISTS members (
   linkedin    TEXT,
   sort_order  INTEGER NOT NULL DEFAULT 0,
   term        TEXT NOT NULL DEFAULT '1',
-  image       TEXT                              -- JSON array stored as text, or a URL
+  image       TEXT,                             -- JSON array stored as text, or a URL
+  bio         TEXT,
+  email       TEXT,
+  twitter     TEXT
+);
+
+-- Add columns to existing installs
+ALTER TABLE members ADD COLUMN IF NOT EXISTS bio     TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS email   TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS twitter TEXT;
+
+-- ─── Terms ───────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS terms (
+  id         SERIAL PRIMARY KEY,
+  name       TEXT NOT NULL UNIQUE,
+  is_current BOOLEAN NOT NULL DEFAULT false
 );
 
 -- ─── Club Stats (single row) ──────────────────────────────────────────────────

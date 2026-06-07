@@ -511,7 +511,7 @@ export default function CoursesAdmin() {
                           </div>
                           <div className="flex-1">
                             <input
-                              type="url"
+                              type="text"
                               placeholder="Playlist URL"
                               value={video.url}
                               onChange={(e) => {

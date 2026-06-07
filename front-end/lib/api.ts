@@ -86,6 +86,12 @@ export type Resource = {
   unit?: string;
 };
 
+export type Term = {
+  id: number;
+  name: string;
+  is_current: boolean;
+};
+
 export type OtherStat = {
   workshops_per_year: number;
   industry_partners: number;
@@ -100,6 +106,12 @@ export type OtherStat = {
 };
 
 // ─── Exported Fetch Functions ─────────────────────────────────────────────────
+
+export async function fetchTerms(): Promise<Term[]> {
+  const res = await fetchWithTimeout(`${API_BASE}/terms`);
+  if (!res.ok) throw new Error("Failed to fetch terms");
+  return res.json();
+}
 
 export async function fetchEvents(): Promise<Event[]> {
   const res = await fetchWithTimeout(`${API_BASE}/events`);
