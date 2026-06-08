@@ -228,18 +228,18 @@ export default function Home() {
                   <Link
                     key={idx}
                     href="/about"
-                    className="flex-shrink-0 w-48 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] flex flex-col items-center gap-3 p-4"
+                    className="flex-shrink-0 w-64 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] flex flex-col items-center gap-3 p-4"
                   >
-                    <div className="w-36 h-36 rounded-xl overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 bg-black/10 dark:bg-white/10 flex items-center justify-center">
+                    <div className="w-52 h-52 rounded-xl overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 bg-black/10 dark:bg-white/10 flex items-center justify-center">
                       {imgUrl ? (
                         <img src={imgUrl} alt={member.name} className="w-full h-full object-cover" />
                       ) : (
-                        <User className="w-16 h-16 text-black/20 dark:text-white/20" />
+                        <User className="w-20 h-20 text-black/20 dark:text-white/20" />
                       )}
                     </div>
                     <div className="text-center">
-                      <p className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-neon-blue transition-colors truncate max-w-[9rem]">{member.name}</p>
-                      <p className="text-xs font-mono text-gray-500 dark:text-white/50 mt-0.5 truncate uppercase tracking-widest max-w-[9rem]">{member.role}</p>
+                      <p className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-neon-blue transition-colors truncate max-w-[13rem]">{member.name}</p>
+                      <p className="text-xs font-mono text-gray-500 dark:text-white/50 mt-0.5 truncate uppercase tracking-widest max-w-[13rem]">{member.role}</p>
                     </div>
                   </Link>
                 );
