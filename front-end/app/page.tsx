@@ -228,13 +228,13 @@ export default function Home() {
                   <Link
                     key={idx}
                     href="/about"
-                    className="flex-shrink-0 w-48 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] flex flex-col items-center gap-3 p-5"
+                    className="flex-shrink-0 w-48 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] flex flex-col items-center gap-3 p-4"
                   >
-                    <div className="w-16 h-16 rounded-full overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 bg-black/10 dark:bg-white/10 flex items-center justify-center">
+                    <div className="w-36 h-36 rounded-xl overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 bg-black/10 dark:bg-white/10 flex items-center justify-center">
                       {imgUrl ? (
                         <img src={imgUrl} alt={member.name} className="w-full h-full object-cover" />
                       ) : (
-                        <User className="w-8 h-8 text-black/20 dark:text-white/20" />
+                        <User className="w-16 h-16 text-black/20 dark:text-white/20" />
                       )}
                     </div>
                     <div className="text-center">
