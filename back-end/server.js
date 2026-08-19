@@ -53,6 +53,8 @@ redisClient.on("error", (err) => {
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_1_date DATE;
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_2_date DATE;
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS final_date DATE;
+            ALTER TABLE resources DROP CONSTRAINT IF EXISTS resources_category_check;
+            ALTER TABLE resources ADD CONSTRAINT resources_category_check CHECK (category IN ('Lecture','Exam','Material','Quiz','Other'));
         `);
         console.log("✓ DB migrations applied");
     } catch (err) {

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS resources (
   course_id      TEXT NOT NULL REFERENCES courses(course_id) ON DELETE CASCADE,
   resource_title TEXT NOT NULL,
   url            TEXT NOT NULL,
-  category       TEXT NOT NULL CHECK (category IN ('Lecture','Exam','Material','Other')),
+  category       TEXT NOT NULL CHECK (category IN ('Lecture','Exam','Material','Quiz','Other')),
   sub_category   TEXT,  -- For organizing within categories (e.g., 'Videos', 'Books & Notes', 'Old Exams')
   semester       TEXT,  -- For exams: e.g., 'Fall 2023', 'Spring 2024'
   chapter        TEXT,  -- For exams: e.g., 'Chapter 1', 'Chapter 2-3'

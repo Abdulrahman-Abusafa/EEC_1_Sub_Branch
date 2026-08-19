@@ -76,7 +76,7 @@ export type Member = {
 
 export type Resource = {
   id?: number;
-  category: "Lecture" | "Exam" | "Material" | "Other" | string;
+  category: "Lecture" | "Exam" | "Material" | "Quiz" | "Other" | string;
   course_id: string;
   resource_title: string;
   url: string;
