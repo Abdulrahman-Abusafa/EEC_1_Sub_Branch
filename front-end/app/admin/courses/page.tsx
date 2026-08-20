@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown, HelpCircle, UploadCloud, CheckCircle2, AlertCircle, Info } from "lucide-react";
-import { fetchCourseResources, createResource, deleteResource, Resource, API_BASE } from "@/lib/api";
+import { fetchCourseResources, createResource, deleteResource, Resource, API_BASE, getUploadApiBase } from "@/lib/api";
 
 const MAX_PDF_MB = 200;
 const MAX_FILENAME_LENGTH = 32;
@@ -146,10 +146,11 @@ export default function CoursesAdmin() {
 
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; percent: number } | null>(null);
-  const uploadPdfWithProgress = (file: File, onProgress: (pct: number) => void): Promise<{ filename: string; url: string }> => {
+  const uploadPdfWithProgress = async (file: File, onProgress: (pct: number) => void): Promise<{ filename: string; url: string }> => {
+    const uploadBase = await getUploadApiBase();
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API_BASE}/upload/pdf`);
+      xhr.open('POST', `${uploadBase}/upload/pdf`);
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
       };
@@ -322,9 +323,10 @@ export default function CoursesAdmin() {
   };
 
   const uploadBookAndGetUrl = async (file: File) => {
+    const uploadBase = await getUploadApiBase();
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch(`${API_BASE}/upload/pdf`, {
+    const res = await fetch(`${uploadBase}/upload/pdf`, {
       method: "POST",
       body: formData,
     });

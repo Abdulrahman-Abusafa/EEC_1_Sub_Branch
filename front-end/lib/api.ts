@@ -19,6 +19,29 @@ export function getPhotoUrl(photo: ImageAttachment[] | string | null | undefined
 const rawApiBase = process.env.NEXT_PUBLIC_API_URL;
 export const API_BASE = rawApiBase && rawApiBase.startsWith("http") ? "/api/proxy" : rawApiBase || "/api/proxy";
 
+// PDF uploads must bypass /api/proxy: on Vercel, Serverless Functions hard-cap
+// request bodies at 4.5 MB, which the proxy would hit for any real PDF long
+// before reaching our own 200 MB multer limit on the backend. Hit the backend
+// directly instead (it already allows all origins via cors()). The real
+// backend URL isn't reliably available client-side (NEXT_PUBLIC_API_URL may
+// just point at the proxy), so fetch it from the server at runtime, where
+// BACKEND_URL is authoritative — and cache the result.
+let cachedUploadBase: string | null = null;
+export async function getUploadApiBase(): Promise<string> {
+  if (rawApiBase && rawApiBase.startsWith("http")) return rawApiBase;
+  if (cachedUploadBase) return cachedUploadBase;
+  let resolved: string = API_BASE;
+  try {
+    const res = await fetch("/api/backend-url");
+    const data = await res.json();
+    if (typeof data.url === "string" && data.url.startsWith("http")) resolved = data.url;
+  } catch {
+    // keep the proxy fallback
+  }
+  cachedUploadBase = resolved;
+  return resolved;
+}
+
 const FETCH_TIMEOUT_MS = 15000;
 
 async function fetchWithTimeout(input: RequestInfo, init?: RequestInit) {
