@@ -110,9 +110,10 @@ const pdfStorage = multer.diskStorage({
 });
 const uploadPdf = multer({
     storage: pdfStorage,
-    limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+    limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
     fileFilter: (_req, file, cb) => {
-        if (file.mimetype === "application/pdf") cb(null, true);
+        const looksLikePdf = file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf");
+        if (looksLikePdf) cb(null, true);
         else cb(new Error("Only PDF files are allowed"));
     },
 });
@@ -619,12 +620,18 @@ app.get("/image", (req, res) => {
  * Body: multipart/form-data with field "file" (PDF)
  * Returns: { filename, url } — store url in courses.books
  */
-app.post("/upload/pdf", uploadPdf.single("file"), (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No PDF file uploaded" });
-    res.status(201).json({
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        url: `/files/${req.file.filename}`,
+app.post("/upload/pdf", (req, res) => {
+    uploadPdf.single("file")(req, res, (err) => {
+        if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+            return res.status(413).json({ error: "File is too large. Maximum size is 200 MB." });
+        }
+        if (err) return res.status(400).json({ error: err.message || "Upload failed" });
+        if (!req.file) return res.status(400).json({ error: "No PDF file uploaded" });
+        res.status(201).json({
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            url: `/files/${req.file.filename}`,
+        });
     });
 });
 

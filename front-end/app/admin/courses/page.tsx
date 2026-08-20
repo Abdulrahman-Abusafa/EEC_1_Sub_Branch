@@ -1,8 +1,87 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown, HelpCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown, HelpCircle, UploadCloud, CheckCircle2, AlertCircle, Info } from "lucide-react";
 import { fetchCourseResources, createResource, deleteResource, Resource, API_BASE } from "@/lib/api";
+
+const MAX_PDF_MB = 200;
+const MAX_FILENAME_LENGTH = 32;
+
+function truncateFilename(name: string, maxLength = MAX_FILENAME_LENGTH): string {
+  if (name.length <= maxLength) return name;
+  const dotIndex = name.lastIndexOf(".");
+  const ext = dotIndex > 0 ? name.slice(dotIndex + 1) : "";
+  const base = dotIndex > 0 ? name.slice(0, dotIndex) : name;
+  const keep = Math.max(maxLength - ext.length - 3, 4);
+  return ext ? `${base.slice(0, keep)}...${ext}` : `${name.slice(0, maxLength - 3)}...`;
+}
+
+function ExamFileDrop({ selectedFile, onFile, onReject }: { selectedFile?: File; onFile: (file: File) => void; onReject: (msg: string) => void }) {
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = (fileList: FileList | null) => {
+    const file = fileList?.[0];
+    if (!file) return;
+    const looksLikePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!looksLikePdf) {
+      onReject(`"${file.name}" isn't a PDF`);
+      return;
+    }
+    if (file.size > MAX_PDF_MB * 1024 * 1024) {
+      onReject(`"${file.name}" is ${(file.size / (1024 * 1024)).toFixed(1)} MB — max is ${MAX_PDF_MB} MB`);
+      return;
+    }
+    onFile(file);
+  };
+
+  if (selectedFile) {
+    return (
+      <div
+        onClick={() => inputRef.current?.click()}
+        className="w-full flex items-center justify-between gap-1.5 text-xs px-3 py-2 border border-green-500/40 bg-green-500/10 text-green-600 dark:text-green-400 rounded cursor-pointer"
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          <CheckCircle2 size={13} className="shrink-0" />
+          <span className="truncate" title={selectedFile.name}>{truncateFilename(selectedFile.name)}</span>
+          <span className="text-green-600/70 dark:text-green-400/70 shrink-0">({(selectedFile.size / (1024 * 1024)).toFixed(1)} MB)</span>
+        </span>
+        <span className="underline shrink-0">Change</span>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf"
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
+          className="hidden"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+      onClick={() => inputRef.current?.click()}
+      className={`w-full flex items-center justify-center gap-1.5 text-xs px-3 py-2 border border-dashed rounded cursor-pointer transition-colors ${
+        dragOver
+          ? "border-neon-blue bg-neon-blue/10 text-neon-blue"
+          : "border-gray-300 dark:border-zinc-700 text-gray-500 dark:text-gray-400 hover:border-neon-blue/50 hover:text-neon-blue"
+      }`}
+    >
+      <UploadCloud size={13} className="shrink-0" />
+      <span>{dragOver ? "Drop PDF here" : "Drag PDF or click to browse"}</span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf"
+        onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
+        className="hidden"
+      />
+    </div>
+  );
+}
 
 type BookItem = { title: string; url: string; file?: File };
 
@@ -55,6 +134,45 @@ export default function CoursesAdmin() {
   const [byChapter, setByChapter] = useState<ChapterEntry[]>([]);
   const [collapsedExamFolders, setCollapsedExamFolders] = useState<Record<string, boolean>>({});
   const [collapsedExams, setCollapsedExams] = useState<Record<string, boolean>>({ major1: true, major2: true, final: true, byChapter: true, quizzes: true, videos: true });
+
+  // Toasts
+  type Toast = { id: number; type: 'success' | 'error' | 'info'; message: string };
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const pushToast = (type: Toast['type'], message: string) => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 6000);
+  };
+
+  // Upload progress
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; percent: number } | null>(null);
+  const uploadPdfWithProgress = (file: File, onProgress: (pct: number) => void): Promise<{ filename: string; url: string }> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/upload/pdf`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            resolve({ filename: data.filename, url: `/api/files/${data.filename}` });
+          } catch {
+            reject(new Error('Invalid server response'));
+          }
+        } else {
+          let msg = `Upload failed (${xhr.status})`;
+          try { const data = JSON.parse(xhr.responseText); if (data.error) msg = data.error; } catch { /* ignore */ }
+          reject(new Error(msg));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      const formData = new FormData();
+      formData.append('file', file);
+      xhr.send(formData);
+    });
+  };
 
   const fetchCourses = async () => {
     try {
@@ -279,7 +397,7 @@ export default function CoursesAdmin() {
           errorMsg = res.statusText || "Server error";
         }
         console.error("Server error response:", String(errorMsg).slice(0, 200));
-        alert(`Failed to save course: ${String(errorMsg).slice(0, 200)}`);
+        pushToast('error', `Failed to save course: ${String(errorMsg).slice(0, 200)}`);
         return;
       }
 
@@ -288,11 +406,13 @@ export default function CoursesAdmin() {
 
       setIsModalOpen(false);
       fetchCourses();
+      pushToast('success', `Course "${courseIdStr}" saved successfully`);
     } catch (e) {
       console.error(e);
-      alert("An error occurred while saving the course");
+      pushToast('error', 'An error occurred while saving the course');
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(null);
     }
   };
 
@@ -310,6 +430,31 @@ export default function CoursesAdmin() {
       // Create new resources
       const allResources: Omit<Resource, 'id'>[] = [];
 
+      // Count how many files need uploading, to drive the progress bar
+      let filesTotal = 0;
+      quizzes.forEach(q => { if (q.file) filesTotal++; });
+      booksAndNotes.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
+      Object.values(oldExams).forEach(entries => entries.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++)));
+      byChapter.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
+
+      let filesDone = 0;
+      if (filesTotal > 0) setUploadProgress({ done: 0, total: filesTotal, percent: 0 });
+
+      const doUpload = async (file: File, label: string): Promise<string> => {
+        try {
+          const result = await uploadPdfWithProgress(file, (pct) => {
+            setUploadProgress({ done: filesDone, total: filesTotal, percent: Math.round(((filesDone + pct / 100) / filesTotal) * 100) });
+          });
+          filesDone++;
+          setUploadProgress({ done: filesDone, total: filesTotal, percent: Math.round((filesDone / filesTotal) * 100) });
+          return result.url;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          pushToast('error', `${label} upload failed for "${file.name}": ${msg}`);
+          throw err;
+        }
+      };
+
       // Add videos
       videos.forEach(video => {
         allResources.push({
@@ -325,12 +470,7 @@ export default function CoursesAdmin() {
       for (const quiz of quizzes) {
         let url = quiz.url;
         if (quiz.file) {
-          const formData = new FormData();
-          formData.append('file', quiz.file);
-          const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
-          if (!uploadRes.ok) throw new Error('Quiz PDF upload failed');
-          const uploadData = await uploadRes.json();
-          url = `/api/files/${uploadData.filename}`;
+          url = await doUpload(quiz.file, 'Quiz PDF');
         }
         if (!url) continue;
         allResources.push({
@@ -347,12 +487,7 @@ export default function CoursesAdmin() {
         if (entry.type === 'single') {
           let url = entry.url;
           if (entry.file) {
-            const formData = new FormData();
-            formData.append('file', entry.file);
-            const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
-            if (!uploadRes.ok) throw new Error('Books & Notes PDF upload failed');
-            const uploadData = await uploadRes.json();
-            url = `/api/files/${uploadData.filename}`;
+            url = await doUpload(entry.file, 'Books & Notes PDF');
           }
           if (!url) continue;
           allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Material', sub_category: 'Books & Notes' });
@@ -360,12 +495,7 @@ export default function CoursesAdmin() {
           for (const item of entry.items) {
             let url = item.url;
             if (item.file) {
-              const formData = new FormData();
-              formData.append('file', item.file);
-              const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
-              if (!uploadRes.ok) throw new Error('Books & Notes PDF upload failed');
-              const uploadData = await uploadRes.json();
-              url = `/api/files/${uploadData.filename}`;
+              url = await doUpload(item.file, 'Books & Notes PDF');
             }
             if (!url) continue;
             allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Material', sub_category: 'Books & Notes', unit: entry.groupTitle });
@@ -380,12 +510,7 @@ export default function CoursesAdmin() {
           if (entry.type === 'single') {
             let url = entry.url;
             if (entry.file) {
-              const formData = new FormData();
-              formData.append('file', entry.file);
-              const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
-              if (!uploadRes.ok) throw new Error('Exam PDF upload failed');
-              const uploadData = await uploadRes.json();
-              url = `/api/files/${uploadData.filename}`;
+              url = await doUpload(entry.file, `${examLabels[key]} Exam PDF`);
             }
             if (!url) continue;
             allResources.push({ course_id: courseId, resource_title: `${examLabels[key]} Exam - ${entry.term}`, url, category: 'Exam', sub_category: examLabels[key], semester: entry.term });
@@ -393,12 +518,7 @@ export default function CoursesAdmin() {
             for (const item of entry.items) {
               let url = item.url;
               if (item.file) {
-                const formData = new FormData();
-                formData.append('file', item.file);
-                const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
-                if (!uploadRes.ok) throw new Error('Exam PDF upload failed');
-                const uploadData = await uploadRes.json();
-                url = `/api/files/${uploadData.filename}`;
+                url = await doUpload(item.file, `${examLabels[key]} Exam PDF`);
               }
               if (!url) continue;
               allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Exam', sub_category: examLabels[key], semester: entry.folderName });
@@ -412,12 +532,7 @@ export default function CoursesAdmin() {
         if (entry.type === 'single') {
           let url = entry.url;
           if (entry.file) {
-            const formData = new FormData();
-            formData.append('file', entry.file);
-            const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
-            if (!uploadRes.ok) throw new Error('Chapter PDF upload failed');
-            const uploadData = await uploadRes.json();
-            url = `/api/files/${uploadData.filename}`;
+            url = await doUpload(entry.file, 'Chapter PDF');
           }
           if (!url) continue;
           allResources.push({ course_id: courseId, resource_title: entry.chapterName, url, category: 'Exam', sub_category: 'Chapter', chapter: entry.chapterName });
@@ -425,12 +540,7 @@ export default function CoursesAdmin() {
           for (const item of entry.items) {
             let url = item.url;
             if (item.file) {
-              const formData = new FormData();
-              formData.append('file', item.file);
-              const uploadRes = await fetch(`${API_BASE}/upload/pdf`, { method: 'POST', body: formData });
-              if (!uploadRes.ok) throw new Error('Chapter PDF upload failed');
-              const uploadData = await uploadRes.json();
-              url = `/api/files/${uploadData.filename}`;
+              url = await doUpload(item.file, 'Chapter PDF');
             }
             if (!url) continue;
             allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Exam', sub_category: 'Chapter', chapter: entry.folderName });
@@ -450,6 +560,26 @@ export default function CoursesAdmin() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto mt-24">
+      <div className="fixed top-20 right-4 z-[100] flex flex-col gap-2 w-80">
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            className={`px-4 py-3 rounded-lg shadow-lg text-sm border flex items-start gap-2 ${
+              t.type === 'success'
+                ? 'bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-400'
+                : t.type === 'error'
+                ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-400'
+                : 'bg-blue-50 dark:bg-blue-500/10 border-neon-blue/30 text-neon-blue'
+            }`}
+          >
+            {t.type === 'success' ? <CheckCircle2 size={16} className="shrink-0 mt-0.5" /> : t.type === 'error' ? <AlertCircle size={16} className="shrink-0 mt-0.5" /> : <Info size={16} className="shrink-0 mt-0.5" />}
+            <span className="flex-1">{t.message}</span>
+            <button onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))} className="opacity-60 hover:opacity-100 shrink-0">
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white">Courses Management</h1>
@@ -952,13 +1082,10 @@ export default function CoursesAdmin() {
                                       {entry.url && !entry.file ? (
                                         <span className="text-xs text-green-500">✓ Uploaded</span>
                                       ) : (
-                                        <input type="file" accept="application/pdf"
-                                          onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
-                                            setOldExams(prev => ({ ...prev, [examType]: prev[examType].map((it, idx) => idx === i && it.type === 'single' ? { ...it, file } : it) }));
-                                          }}
-                                          className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                        <ExamFileDrop
+                                          selectedFile={entry.file}
+                                          onFile={(file) => setOldExams(prev => ({ ...prev, [examType]: prev[examType].map((it, idx) => idx === i && it.type === 'single' ? { ...it, file } : it) }))}
+                                          onReject={(msg) => pushToast('error', msg)}
                                         />
                                       )}
                                     </div>
@@ -1015,18 +1142,13 @@ export default function CoursesAdmin() {
                                             {item.url && !item.file ? (
                                               <span className="text-xs text-green-500">✓ Uploaded</span>
                                             ) : (
-                                              <input
-                                                type="file"
-                                                accept="application/pdf"
-                                                onChange={(e) => {
-                                                  const file = e.target.files?.[0];
-                                                  if (!file) return;
-                                                  setOldExams(prev => ({ ...prev, [examType]: prev[examType].map((en, idx) => {
-                                                    if (idx !== i || en.type !== 'folder') return en;
-                                                    return { ...en, items: en.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
-                                                  }) }));
-                                                }}
-                                                className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                              <ExamFileDrop
+                                                selectedFile={item.file}
+                                                onFile={(file) => setOldExams(prev => ({ ...prev, [examType]: prev[examType].map((en, idx) => {
+                                                  if (idx !== i || en.type !== 'folder') return en;
+                                                  return { ...en, items: en.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
+                                                }) }))}
+                                                onReject={(msg) => pushToast('error', msg)}
                                               />
                                             )}
                                           </div>
@@ -1097,9 +1219,10 @@ export default function CoursesAdmin() {
                                   {entry.url && !entry.file ? (
                                     <span className="text-xs text-green-500">✓ Uploaded</span>
                                   ) : (
-                                    <input type="file" accept="application/pdf"
-                                      onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setByChapter(prev => prev.map((it, idx) => idx === i && it.type === 'single' ? { ...it, file } : it)); }}
-                                      className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                    <ExamFileDrop
+                                      selectedFile={entry.file}
+                                      onFile={(file) => setByChapter(prev => prev.map((it, idx) => idx === i && it.type === 'single' ? { ...it, file } : it))}
+                                      onReject={(msg) => pushToast('error', msg)}
                                     />
                                   )}
                                 </div>
@@ -1153,18 +1276,13 @@ export default function CoursesAdmin() {
                                         {item.url && !item.file ? (
                                           <span className="text-xs text-green-500">✓ Uploaded</span>
                                         ) : (
-                                          <input
-                                            type="file"
-                                            accept="application/pdf"
-                                            onChange={(e) => {
-                                              const file = e.target.files?.[0];
-                                              if (!file) return;
-                                              setByChapter(prev => prev.map((en, idx) => {
-                                                if (idx !== i || en.type !== 'folder') return en;
-                                                return { ...en, items: en.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
-                                              }));
-                                            }}
-                                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                          <ExamFileDrop
+                                            selectedFile={item.file}
+                                            onFile={(file) => setByChapter(prev => prev.map((en, idx) => {
+                                              if (idx !== i || en.type !== 'folder') return en;
+                                              return { ...en, items: en.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
+                                            }))}
+                                            onReject={(msg) => pushToast('error', msg)}
                                           />
                                         )}
                                       </div>
@@ -1198,6 +1316,18 @@ export default function CoursesAdmin() {
                       </div>
                     </div>
                   </div>
+
+                  {uploadProgress && (
+                    <div className="pt-4">
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        <span>Uploading files… ({uploadProgress.done}/{uploadProgress.total})</span>
+                        <span>{uploadProgress.percent}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-neon-blue transition-all duration-200" style={{ width: `${uploadProgress.percent}%` }} />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-6 flex justify-end gap-3">
                     <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition" disabled={isSubmitting}>Cancel</button>
