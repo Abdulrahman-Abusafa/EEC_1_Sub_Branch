@@ -117,13 +117,16 @@ export default function CoursesAdmin() {
 
   // Resources State - restructured for bulk management
   const [videos, setVideos] = useState<{ title: string; url: string }[]>([]);
-  const [quizzes, setQuizzes] = useState<{ title: string; url: string; file?: File }[]>([]);
+  type ExamFileItem = { title: string; url: string; file?: File };
+  type SingleQuizItem = { type: 'single'; title: string; url: string; file?: File };
+  type QuizFolderItem = { type: 'folder'; folderName: string; items: ExamFileItem[] };
+  type QuizEntry = SingleQuizItem | QuizFolderItem;
+  const [quizzes, setQuizzes] = useState<QuizEntry[]>([]);
   type SingleBookNote = { type: 'single'; title: string; url: string; file?: File };
   type ListBookNote  = { type: 'list'; groupTitle: string; items: { title: string; url: string; file?: File }[] };
   type BookNoteEntry = SingleBookNote | ListBookNote;
   const [booksAndNotes, setBooksAndNotes] = useState<BookNoteEntry[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<number, boolean>>({});
-  type ExamFileItem = { title: string; url: string; file?: File };
   type SingleExamItem = { type: 'single'; term: string; url: string; file?: File };
   type ExamFolderItem = { type: 'folder'; folderName: string; items: ExamFileItem[] };
   type ExamEntry = SingleExamItem | ExamFolderItem;
@@ -201,7 +204,8 @@ export default function CoursesAdmin() {
     try {
       const resourcesData = await fetchCourseResources(courseId);
       const videosList: { title: string; url: string }[] = [];
-      const quizzesList: { title: string; url: string }[] = [];
+      const quizEntries: QuizEntry[] = [];
+      const quizFolders: Record<string, ExamFileItem[]> = {};
       const booksAndNotesEntries: BookNoteEntry[] = [];
       const listGroups: Record<string, { title: string; url: string }[]> = {};
       const examBuckets: { major1: Record<string, ExamFileItem[]>; major2: Record<string, ExamFileItem[]>; final: Record<string, ExamFileItem[]> } = { major1: {}, major2: {}, final: {} };
@@ -212,7 +216,12 @@ export default function CoursesAdmin() {
         if (resource.sub_category === 'Videos') {
           videosList.push({ title: resource.resource_title, url: resource.url });
         } else if (resource.sub_category === 'Quizzes') {
-          quizzesList.push({ title: resource.resource_title, url: resource.url });
+          if (resource.unit) {
+            if (!quizFolders[resource.unit]) quizFolders[resource.unit] = [];
+            quizFolders[resource.unit].push({ title: resource.resource_title, url: resource.url });
+          } else {
+            quizEntries.push({ type: 'single', title: resource.resource_title, url: resource.url });
+          }
         } else if (resource.sub_category === 'Books & Notes') {
           if (resource.unit) {
             if (!listGroups[resource.unit]) listGroups[resource.unit] = [];
@@ -236,6 +245,10 @@ export default function CoursesAdmin() {
         booksAndNotesEntries.push({ type: 'list', groupTitle, items });
       });
 
+      Object.entries(quizFolders).forEach(([folderName, items]) => {
+        quizEntries.push({ type: 'folder', folderName, items });
+      });
+
       const examsData: { major1: ExamEntry[]; major2: ExamEntry[]; final: ExamEntry[] } = { major1: [], major2: [], final: [] };
       (['major1', 'major2', 'final'] as const).forEach(key => {
         Object.entries(examBuckets[key]).forEach(([term, items]) => {
@@ -257,7 +270,7 @@ export default function CoursesAdmin() {
       });
 
       setVideos(videosList);
-      setQuizzes(quizzesList);
+      setQuizzes(quizEntries);
       setBooksAndNotes(booksAndNotesEntries);
       setOldExams(examsData);
       setByChapter(byChapterEntries);
@@ -432,7 +445,7 @@ export default function CoursesAdmin() {
 
       // Count how many files need uploading, to drive the progress bar
       let filesTotal = 0;
-      quizzes.forEach(q => { if (q.file) filesTotal++; });
+      quizzes.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
       booksAndNotes.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
       Object.values(oldExams).forEach(entries => entries.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++)));
       byChapter.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
@@ -467,19 +480,24 @@ export default function CoursesAdmin() {
       });
 
       // Add quizzes — upload any new PDF files first
-      for (const quiz of quizzes) {
-        let url = quiz.url;
-        if (quiz.file) {
-          url = await doUpload(quiz.file, 'Quiz PDF');
+      for (const entry of quizzes) {
+        if (entry.type === 'single') {
+          let url = entry.url;
+          if (entry.file) {
+            url = await doUpload(entry.file, 'Quiz PDF');
+          }
+          if (!url) continue;
+          allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Quiz', sub_category: 'Quizzes' });
+        } else {
+          for (const item of entry.items) {
+            let url = item.url;
+            if (item.file) {
+              url = await doUpload(item.file, 'Quiz PDF');
+            }
+            if (!url) continue;
+            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Quiz', sub_category: 'Quizzes', unit: entry.folderName });
+          }
         }
-        if (!url) continue;
-        allResources.push({
-          course_id: courseId,
-          resource_title: quiz.title,
-          url,
-          category: 'Quiz',
-          sub_category: 'Quizzes'
-        });
       }
 
       // Add books and notes — upload any new PDF files first
@@ -782,16 +800,25 @@ export default function CoursesAdmin() {
                           >
                             <ChevronDown size={15} className={`text-neon-blue transition-transform duration-200 ${!collapsedExams.quizzes ? 'rotate-180' : ''}`} />
                             Quizzes
-                            {quizzes.length > 0 && <span className="text-xs font-mono text-gray-400 dark:text-white/30">{quizzes.length} quizzes</span>}
+                            {quizzes.length > 0 && <span className="text-xs font-mono text-gray-400 dark:text-white/30">{quizzes.reduce((acc, entry) => acc + (entry.type === 'single' ? 1 : entry.items.length), 0)} files</span>}
                           </button>
                           {!collapsedExams.quizzes && (
-                            <button
-                              type="button"
-                              onClick={() => setQuizzes(prev => [...prev, { title: "", url: "" }])}
-                              className="text-xs bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue border border-neon-blue/20 px-3 py-1.5 rounded-lg"
-                            >
-                              + Add
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setQuizzes(prev => [...prev, { type: 'single', title: "", url: "" }])}
+                                className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg"
+                              >
+                                + Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setQuizzes(prev => [...prev, { type: 'folder', folderName: '', items: [{ title: '', url: '' }] }])}
+                                className="flex items-center gap-1.5 text-xs bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue px-3 py-1.5 rounded-lg border border-neon-blue/20"
+                              >
+                                <Layers size={13} /> Add Folder
+                              </button>
+                            </div>
                           )}
                         </div>
                         {!collapsedExams.quizzes && (
@@ -799,33 +826,29 @@ export default function CoursesAdmin() {
                             {quizzes.length === 0 && (
                               <p className="text-sm text-gray-400 dark:text-gray-500 italic px-1">No quizzes added yet</p>
                             )}
-                            {quizzes.map((quiz, i) => (
+                            {quizzes.map((entry, i) => entry.type === 'single' ? (
+                              // ── Single Item ──
                               <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
                                 <div className="flex-1">
                                   <input
                                     type="text"
                                     placeholder="Quiz Title (e.g., Chapter 1 Quiz)"
-                                    value={quiz.title}
+                                    value={entry.title}
                                     onChange={(e) => {
                                       const val = e.target.value;
-                                      setQuizzes(prev => prev.map((it, idx) => idx === i ? { ...it, title: val } : it));
+                                      setQuizzes(prev => prev.map((it, idx) => idx === i && it.type === 'single' ? { ...it, title: val } : it));
                                     }}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
                                   />
                                 </div>
                                 <div className="flex-1">
-                                  {quiz.url && !quiz.file ? (
+                                  {entry.url && !entry.file ? (
                                     <span className="text-xs text-green-500 flex items-center gap-1">✓ Uploaded</span>
                                   ) : (
-                                    <input
-                                      type="file"
-                                      accept="application/pdf"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (!file) return;
-                                        setQuizzes(prev => prev.map((it, idx) => idx === i ? { ...it, file } : it));
-                                      }}
-                                      className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                    <ExamFileDrop
+                                      selectedFile={entry.file}
+                                      onFile={(file) => setQuizzes(prev => prev.map((it, idx) => idx === i && it.type === 'single' ? { ...it, file } : it))}
+                                      onReject={(msg) => pushToast('error', msg)}
                                     />
                                   )}
                                 </div>
@@ -836,6 +859,89 @@ export default function CoursesAdmin() {
                                 >
                                   <X size={15} />
                                 </button>
+                              </div>
+                            ) : (
+                              // ── Folder ──
+                              <div key={i} className="border border-neon-blue/20 rounded-xl overflow-hidden">
+                                <div className="flex items-center gap-3 px-4 py-3 bg-neon-blue/5 border-b border-neon-blue/10">
+                                  <Layers size={15} className="text-neon-blue flex-shrink-0" />
+                                  <input
+                                    type="text"
+                                    placeholder="Folder name (e.g. Midterm Quizzes)"
+                                    value={entry.folderName}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setQuizzes(prev => prev.map((it, idx) => idx === i && it.type === 'folder' ? { ...it, folderName: val } : it));
+                                    }}
+                                    className="flex-1 px-3 py-1.5 text-sm font-medium border border-transparent focus:border-neon-blue/40 rounded bg-transparent dark:text-white outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setCollapsedExamFolders(prev => ({ ...prev, [`quiz-${i}`]: !prev[`quiz-${i}`] }))}
+                                    className="p-1.5 hover:bg-neon-blue/10 rounded text-neon-blue flex-shrink-0"
+                                  >
+                                    <ChevronDown size={15} className={`transition-transform duration-200 ${collapsedExamFolders[`quiz-${i}`] ? "-rotate-90" : ""}`} />
+                                  </button>
+                                  <button type="button" onClick={() => setQuizzes(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 p-1.5 hover:bg-red-500/10 rounded flex-shrink-0">
+                                    <X size={15} />
+                                  </button>
+                                </div>
+                                <div className={`p-3 flex flex-col gap-2 ${collapsedExamFolders[`quiz-${i}`] ? "hidden" : ""}`}>
+                                  {entry.items.map((item, j) => (
+                                    <div key={j} className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                      <span className="text-xs font-mono text-gray-400 dark:text-white/30 w-5 text-center">{j + 1}</span>
+                                      <div className="flex-1">
+                                        <input
+                                          type="text"
+                                          placeholder={`File ${j + 1} title`}
+                                          value={item.title}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setQuizzes(prev => prev.map((en, idx) => {
+                                              if (idx !== i || en.type !== 'folder') return en;
+                                              return { ...en, items: en.items.map((it, jdx) => jdx === j ? { ...it, title: val } : it) };
+                                            }));
+                                          }}
+                                          className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                                        />
+                                      </div>
+                                      <div className="flex-1">
+                                        {item.url && !item.file ? (
+                                          <span className="text-xs text-green-500">✓ Uploaded</span>
+                                        ) : (
+                                          <ExamFileDrop
+                                            selectedFile={item.file}
+                                            onFile={(file) => setQuizzes(prev => prev.map((en, idx) => {
+                                              if (idx !== i || en.type !== 'folder') return en;
+                                              return { ...en, items: en.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
+                                            }))}
+                                            onReject={(msg) => pushToast('error', msg)}
+                                          />
+                                        )}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setQuizzes(prev => prev.map((en, idx) => {
+                                          if (idx !== i || en.type !== 'folder') return en;
+                                          return { ...en, items: en.items.filter((_, jdx) => jdx !== j) };
+                                        }))}
+                                        className="text-red-500 p-1 hover:bg-red-500/10 rounded flex-shrink-0"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => setQuizzes(prev => prev.map((en, idx) => {
+                                      if (idx !== i || en.type !== 'folder') return en;
+                                      return { ...en, items: [...en.items, { title: '', url: '' }] };
+                                    }))}
+                                    className="mt-1 flex items-center gap-1.5 text-xs text-neon-blue hover:text-neon-blue/80 px-2 py-1.5 rounded transition-colors self-start"
+                                  >
+                                    <Plus size={13} /> Add File
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
