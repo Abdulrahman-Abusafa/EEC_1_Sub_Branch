@@ -645,6 +645,131 @@ export default function CoursesAdmin() {
     });
   };
 
+  const moveQuiz = (index: number, delta: -1 | 1) => {
+    setQuizzes(prev => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const moveQuizItem = (entryIndex: number, itemIndex: number, delta: -1 | 1) => {
+    setQuizzes(prev => prev.map((en, idx) => {
+      if (idx !== entryIndex || en.type !== 'folder') return en;
+      const target = itemIndex + delta;
+      if (target < 0 || target >= en.items.length) return en;
+      const nextItems = [...en.items];
+      [nextItems[itemIndex], nextItems[target]] = [nextItems[target], nextItems[itemIndex]];
+      return { ...en, items: nextItems };
+    }));
+  };
+
+  const moveHomework = (index: number, delta: -1 | 1) => {
+    setHomeworks(prev => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const moveHomeworkItem = (entryIndex: number, itemIndex: number, delta: -1 | 1) => {
+    setHomeworks(prev => prev.map((en, idx) => {
+      if (idx !== entryIndex || en.type !== 'folder') return en;
+      const target = itemIndex + delta;
+      if (target < 0 || target >= en.items.length) return en;
+      const nextItems = [...en.items];
+      [nextItems[itemIndex], nextItems[target]] = [nextItems[target], nextItems[itemIndex]];
+      return { ...en, items: nextItems };
+    }));
+  };
+
+  const moveBook = (index: number, delta: -1 | 1) => {
+    setBooksAndNotes(prev => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const moveBookItem = (entryIndex: number, itemIndex: number, delta: -1 | 1) => {
+    setBooksAndNotes(prev => prev.map((en, idx) => {
+      if (idx !== entryIndex || en.type !== 'list') return en;
+      const target = itemIndex + delta;
+      if (target < 0 || target >= en.items.length) return en;
+      const nextItems = [...en.items];
+      [nextItems[itemIndex], nextItems[target]] = [nextItems[target], nextItems[itemIndex]];
+      return { ...en, items: nextItems };
+    }));
+  };
+
+  const moveExam = (examType: 'major1' | 'major2' | 'final', index: number, delta: -1 | 1) => {
+    setOldExams(prev => {
+      const arr = prev[examType];
+      const target = index + delta;
+      if (target < 0 || target >= arr.length) return prev;
+      const nextArr = [...arr];
+      [nextArr[index], nextArr[target]] = [nextArr[target], nextArr[index]];
+      return { ...prev, [examType]: nextArr };
+    });
+  };
+
+  const moveExamItem = (examType: 'major1' | 'major2' | 'final', entryIndex: number, itemIndex: number, delta: -1 | 1) => {
+    setOldExams(prev => ({
+      ...prev,
+      [examType]: prev[examType].map((en, idx) => {
+        if (idx !== entryIndex || en.type !== 'folder') return en;
+        const target = itemIndex + delta;
+        if (target < 0 || target >= en.items.length) return en;
+        const nextItems = [...en.items];
+        [nextItems[itemIndex], nextItems[target]] = [nextItems[target], nextItems[itemIndex]];
+        return { ...en, items: nextItems };
+      })
+    }));
+  };
+
+  const moveChapter = (index: number, delta: -1 | 1) => {
+    setByChapter(prev => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const moveChapterItem = (entryIndex: number, itemIndex: number, delta: -1 | 1) => {
+    setByChapter(prev => prev.map((en, idx) => {
+      if (idx !== entryIndex || en.type !== 'folder') return en;
+      const target = itemIndex + delta;
+      if (target < 0 || target >= en.items.length) return en;
+      const nextItems = [...en.items];
+      [nextItems[itemIndex], nextItems[target]] = [nextItems[target], nextItems[itemIndex]];
+      return { ...en, items: nextItems };
+    }));
+  };
+
+  // Reusable up/down arrow buttons
+  const ReorderArrows = ({ onUp, onDown, disabledUp, disabledDown }: { onUp: () => void; onDown: () => void; disabledUp?: boolean; disabledDown?: boolean }) => (
+    <div className="flex flex-col shrink-0">
+      <button type="button" disabled={disabledUp} onClick={onUp}
+        className="p-0.5 disabled:opacity-25 hover:bg-black/5 dark:hover:bg-white/5 rounded text-gray-600 dark:text-gray-300"
+        aria-label="Move up">
+        <ChevronUp size={14} />
+      </button>
+      <button type="button" disabled={disabledDown} onClick={onDown}
+        className="p-0.5 disabled:opacity-25 hover:bg-black/5 dark:hover:bg-white/5 rounded text-gray-600 dark:text-gray-300"
+        aria-label="Move down">
+        <ChevronDown size={14} />
+      </button>
+    </div>
+  );
+
   return (
     <div className="p-8 max-w-6xl mx-auto mt-24">
       <div className="fixed top-20 right-4 z-[100] flex flex-col gap-2 w-80">
@@ -918,6 +1043,7 @@ export default function CoursesAdmin() {
                             {quizzes.map((entry, i) => entry.type === 'single' ? (
                               // ── Single Item ──
                               <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                <ReorderArrows onUp={() => moveQuiz(i, -1)} onDown={() => moveQuiz(i, 1)} disabledUp={i === 0} disabledDown={i === quizzes.length - 1} />
                                 <div className="flex-1">
                                   <input
                                     type="text"
@@ -953,6 +1079,7 @@ export default function CoursesAdmin() {
                               // ── Folder ──
                               <div key={i} className="border border-neon-blue/20 rounded-xl overflow-hidden">
                                 <div className="flex items-center gap-3 px-4 py-3 bg-neon-blue/5 border-b border-neon-blue/10">
+                                  <ReorderArrows onUp={() => moveQuiz(i, -1)} onDown={() => moveQuiz(i, 1)} disabledUp={i === 0} disabledDown={i === quizzes.length - 1} />
                                   <Layers size={15} className="text-neon-blue flex-shrink-0" />
                                   <input
                                     type="text"
@@ -978,6 +1105,7 @@ export default function CoursesAdmin() {
                                 <div className={`p-3 flex flex-col gap-2 ${collapsedExamFolders[`quiz-${i}`] ? "hidden" : ""}`}>
                                   {entry.items.map((item, j) => (
                                     <div key={j} className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                      <ReorderArrows onUp={() => moveQuizItem(i, j, -1)} onDown={() => moveQuizItem(i, j, 1)} disabledUp={j === 0} disabledDown={j === entry.items.length - 1} />
                                       <span className="text-xs font-mono text-gray-400 dark:text-white/30 w-5 text-center">{j + 1}</span>
                                       <div className="flex-1">
                                         <input
@@ -1081,6 +1209,7 @@ export default function CoursesAdmin() {
                             )}
                             {homeworks.map((entry, i) => entry.type === 'single' ? (
                               <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                <ReorderArrows onUp={() => moveHomework(i, -1)} onDown={() => moveHomework(i, 1)} disabledUp={i === 0} disabledDown={i === homeworks.length - 1} />
                                 <div className="flex-1">
                                   <input
                                     type="text"
@@ -1115,6 +1244,7 @@ export default function CoursesAdmin() {
                             ) : (
                               <div key={i} className="border border-neon-blue/20 rounded-xl overflow-hidden">
                                 <div className="flex items-center gap-3 px-4 py-3 bg-neon-blue/5 border-b border-neon-blue/10">
+                                  <ReorderArrows onUp={() => moveHomework(i, -1)} onDown={() => moveHomework(i, 1)} disabledUp={i === 0} disabledDown={i === homeworks.length - 1} />
                                   <Layers size={15} className="text-neon-blue flex-shrink-0" />
                                   <input
                                     type="text"
@@ -1140,6 +1270,7 @@ export default function CoursesAdmin() {
                                 <div className={`p-3 flex flex-col gap-2 ${collapsedExamFolders[`hw-${i}`] ? "hidden" : ""}`}>
                                   {entry.items.map((item, j) => (
                                     <div key={j} className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                      <ReorderArrows onUp={() => moveHomeworkItem(i, j, -1)} onDown={() => moveHomeworkItem(i, j, 1)} disabledUp={j === 0} disabledDown={j === entry.items.length - 1} />
                                       <span className="text-xs font-mono text-gray-400 dark:text-white/30 w-5 text-center">{j + 1}</span>
                                       <div className="flex-1">
                                         <input
@@ -1233,6 +1364,7 @@ export default function CoursesAdmin() {
                         {booksAndNotes.map((entry, i) => entry.type === 'single' ? (
                           // ── Single Item ──
                           <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 rounded-lg">
+                            <ReorderArrows onUp={() => moveBook(i, -1)} onDown={() => moveBook(i, 1)} disabledUp={i === 0} disabledDown={i === booksAndNotes.length - 1} />
                             <FileText size={15} className="text-gray-400 dark:text-white/30 flex-shrink-0" />
                             <div className="flex-1">
                               <input
@@ -1274,6 +1406,7 @@ export default function CoursesAdmin() {
                           <div key={i} className="border border-neon-blue/20 rounded-xl overflow-hidden">
                             {/* Group Header */}
                             <div className="flex items-center gap-3 px-4 py-3 bg-neon-blue/5 border-b border-neon-blue/10">
+                              <ReorderArrows onUp={() => moveBook(i, -1)} onDown={() => moveBook(i, 1)} disabledUp={i === 0} disabledDown={i === booksAndNotes.length - 1} />
                               <Layers size={15} className="text-neon-blue flex-shrink-0" />
                               <input
                                 type="text"
@@ -1303,6 +1436,7 @@ export default function CoursesAdmin() {
                             <div className={`p-3 flex flex-col gap-2 ${collapsedGroups[i] ? "hidden" : ""}`}>
                               {entry.items.map((item, j) => (
                                 <div key={j} className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                  <ReorderArrows onUp={() => moveBookItem(i, j, -1)} onDown={() => moveBookItem(i, j, 1)} disabledUp={j === 0} disabledDown={j === entry.items.length - 1} />
                                   <span className="text-xs font-mono text-gray-400 dark:text-white/30 w-5 text-center">{j + 1}</span>
                                   <div className="flex-1">
                                     <input
@@ -1425,6 +1559,7 @@ export default function CoursesAdmin() {
                                 {entries.map((entry, i) => entry.type === 'single' ? (
                                   // ── Single Item ──
                                   <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                    <ReorderArrows onUp={() => moveExam(examType, i, -1)} onDown={() => moveExam(examType, i, 1)} disabledUp={i === 0} disabledDown={i === entries.length - 1} />
                                     <input
                                       type="text"
                                       placeholder="Term (e.g. 241)"
@@ -1454,6 +1589,7 @@ export default function CoursesAdmin() {
                                   // ── Folder ──
                                   <div key={i} className="border border-neon-blue/20 rounded-xl overflow-hidden">
                                     <div className="flex items-center gap-3 px-4 py-3 bg-neon-blue/5 border-b border-neon-blue/10">
+                                      <ReorderArrows onUp={() => moveExam(examType, i, -1)} onDown={() => moveExam(examType, i, 1)} disabledUp={i === 0} disabledDown={i === entries.length - 1} />
                                       <Layers size={15} className="text-neon-blue flex-shrink-0" />
                                       <input
                                         type="text"
@@ -1479,6 +1615,7 @@ export default function CoursesAdmin() {
                                     <div className={`p-3 flex flex-col gap-2 ${collapsedExamFolders[`${examType}-${i}`] ? "hidden" : ""}`}>
                                       {entry.items.map((item, j) => (
                                         <div key={j} className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                          <ReorderArrows onUp={() => moveExamItem(examType, i, j, -1)} onDown={() => moveExamItem(examType, i, j, 1)} disabledUp={j === 0} disabledDown={j === entry.items.length - 1} />
                                           <span className="text-xs font-mono text-gray-400 dark:text-white/30 w-5 text-center">{j + 1}</span>
                                           <div className="flex-1">
                                             <input
@@ -1568,6 +1705,7 @@ export default function CoursesAdmin() {
                             {byChapter.map((entry, i) => entry.type === 'single' ? (
                               // ── Single Item ──
                               <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                <ReorderArrows onUp={() => moveChapter(i, -1)} onDown={() => moveChapter(i, 1)} disabledUp={i === 0} disabledDown={i === byChapter.length - 1} />
                                 <input type="text" placeholder="Chapter name" value={entry.chapterName}
                                   onChange={(e) => { const val = e.target.value; setByChapter(prev => prev.map((it, idx) => idx === i && it.type === 'single' ? { ...it, chapterName: val } : it)); }}
                                   className="w-40 shrink-0 px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
@@ -1591,6 +1729,7 @@ export default function CoursesAdmin() {
                               // ── Folder ──
                               <div key={i} className="border border-neon-blue/20 rounded-xl overflow-hidden">
                                 <div className="flex items-center gap-3 px-4 py-3 bg-neon-blue/5 border-b border-neon-blue/10">
+                                  <ReorderArrows onUp={() => moveChapter(i, -1)} onDown={() => moveChapter(i, 1)} disabledUp={i === 0} disabledDown={i === byChapter.length - 1} />
                                   <Layers size={15} className="text-neon-blue flex-shrink-0" />
                                   <input
                                     type="text"
@@ -1613,6 +1752,7 @@ export default function CoursesAdmin() {
                                 <div className={`p-3 flex flex-col gap-2 ${collapsedExamFolders[`chapter-${i}`] ? "hidden" : ""}`}>
                                   {entry.items.map((item, j) => (
                                     <div key={j} className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                      <ReorderArrows onUp={() => moveChapterItem(i, j, -1)} onDown={() => moveChapterItem(i, j, 1)} disabledUp={j === 0} disabledDown={j === entry.items.length - 1} />
                                       <span className="text-xs font-mono text-gray-400 dark:text-white/30 w-5 text-center">{j + 1}</span>
                                       <div className="flex-1">
                                         <input
