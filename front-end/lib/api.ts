@@ -47,6 +47,8 @@ export type Course = {
   objectives: string;
   prerequisites: string;
   title: string;
+  syllabus?: string | null;
+  industry_overview?: string | null;
 };
 
 export type Event = {
@@ -76,7 +78,7 @@ export type Member = {
 
 export type Resource = {
   id?: number;
-  category: "Lecture" | "Exam" | "Material" | "Quiz" | "Other" | string;
+  category: "Lecture" | "Exam" | "Material" | "Quiz" | "Homework" | "Other" | string;
   course_id: string;
   resource_title: string;
   url: string;
@@ -84,6 +86,7 @@ export type Resource = {
   semester?: string;
   chapter?: string;
   unit?: string;
+  sort_order?: number;
 };
 
 export type Term = {

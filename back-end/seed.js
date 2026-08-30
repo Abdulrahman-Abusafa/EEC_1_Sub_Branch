@@ -77,26 +77,34 @@ async function seed() {
 
     // ── Resources ────────────────────────────────────────────────────────────
     const resources = [
-      { course_id: "EE200", resource_title: "Chapter 1 – Basic Concepts", url: "#", category: "Lecture" },
-      { course_id: "EE200", resource_title: "Chapter 2 – Resistive Circuits", url: "#", category: "Lecture" },
-      { course_id: "EE200", resource_title: "Major 1 – Spring 2024", url: "#", category: "Exam" },
-      { course_id: "EE200", resource_title: "Final Exam – Fall 2023", url: "#", category: "Exam" },
-      { course_id: "EE200", resource_title: "Formula Sheet", url: "#", category: "Material" },
+      // EE200
+      { course_id: "EE200", resource_title: "Chapter 1 – Basic Concepts", url: "#", category: "Lecture", sub_category: "Videos" },
+      { course_id: "EE200", resource_title: "Chapter 2 – Resistive Circuits", url: "#", category: "Lecture", sub_category: "Videos" },
+      { course_id: "EE200", resource_title: "Major 1 – Spring 2024", url: "#", category: "Exam", sub_category: "Major 1", semester: "Spring 2024" },
+      { course_id: "EE200", resource_title: "Final Exam – Fall 2023", url: "#", category: "Exam", sub_category: "Final", semester: "Fall 2023" },
+      { course_id: "EE200", resource_title: "Formula Sheet", url: "#", category: "Material", sub_category: "Books & Notes" },
 
-      { course_id: "EE201", resource_title: "Lecture 1 – Laplace Transform Intro", url: "#", category: "Lecture" },
-      { course_id: "EE201", resource_title: "Lecture 2 – Frequency Response", url: "#", category: "Lecture" },
-      { course_id: "EE201", resource_title: "Major 2 – Fall 2024", url: "#", category: "Exam" },
-      { course_id: "EE201", resource_title: "Filter Design Notes", url: "#", category: "Material" },
+      // EE201
+      { course_id: "EE201", resource_title: "Lecture 1 – Laplace Transform Intro", url: "#", category: "Lecture", sub_category: "Videos" },
+      { course_id: "EE201", resource_title: "Lecture 2 – Frequency Response", url: "#", category: "Lecture", sub_category: "Videos" },
+      { course_id: "EE201", resource_title: "Lecture 3 – Two-Port Networks", url: "#", category: "Lecture", sub_category: "Videos" },
+      { course_id: "EE201", resource_title: "Major 2 – Fall 2024", url: "#", category: "Exam", sub_category: "Major 2", semester: "Fall 2024" },
+      { course_id: "EE201", resource_title: "Filter Design Notes", url: "#", category: "Material", sub_category: "Books & Notes" },
+      { course_id: "EE201", resource_title: "Quiz 1 – Laplace", url: "#", category: "Quiz", sub_category: "Quizzes" },
+      { course_id: "EE201", resource_title: "Quiz 2 – Frequency Response", url: "#", category: "Quiz", sub_category: "Quizzes" },
+      { course_id: "EE201", resource_title: "Homework 1 – Circuit Analysis", url: "#", category: "Homework", sub_category: "Homeworks" },
+      { course_id: "EE201", resource_title: "Homework 2 – Filter Design", url: "#", category: "Homework", sub_category: "Homeworks" },
 
-      { course_id: "EE303", resource_title: "Fourier Series Slides", url: "#", category: "Lecture" },
-      { course_id: "EE303", resource_title: "Z-Transform Summary", url: "#", category: "Material" },
-      { course_id: "EE303", resource_title: "Final – Spring 2023", url: "#", category: "Exam" },
+      // EE303
+      { course_id: "EE303", resource_title: "Fourier Series Slides", url: "#", category: "Lecture", sub_category: "Videos" },
+      { course_id: "EE303", resource_title: "Z-Transform Summary", url: "#", category: "Material", sub_category: "Books & Notes" },
+      { course_id: "EE303", resource_title: "Final – Spring 2023", url: "#", category: "Exam", sub_category: "Final", semester: "Spring 2023" },
     ];
 
     for (const r of resources) {
       await client.query(
-        `INSERT INTO resources (course_id, resource_title, url, category) VALUES ($1,$2,$3,$4)`,
-        [r.course_id, r.resource_title, r.url, r.category]
+        `INSERT INTO resources (course_id, resource_title, url, category, sub_category, semester) VALUES ($1,$2,$3,$4,$5,$6)`,
+        [r.course_id, r.resource_title, r.url, r.category, r.sub_category || null, r.semester || null]
       );
     }
     console.log("✓ Resources seeded");

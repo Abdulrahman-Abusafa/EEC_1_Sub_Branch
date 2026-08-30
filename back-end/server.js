@@ -49,12 +49,15 @@ redisClient.on("error", (err) => {
             ALTER TABLE resources ADD COLUMN IF NOT EXISTS semester TEXT;
             ALTER TABLE resources ADD COLUMN IF NOT EXISTS chapter TEXT;
             ALTER TABLE resources ADD COLUMN IF NOT EXISTS unit TEXT;
+            ALTER TABLE resources ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS books TEXT;
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_1_date DATE;
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_2_date DATE;
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS final_date DATE;
+            ALTER TABLE courses ADD COLUMN IF NOT EXISTS syllabus TEXT;
+            ALTER TABLE courses ADD COLUMN IF NOT EXISTS industry_overview TEXT;
             ALTER TABLE resources DROP CONSTRAINT IF EXISTS resources_category_check;
-            ALTER TABLE resources ADD CONSTRAINT resources_category_check CHECK (category IN ('Lecture','Exam','Material','Quiz','Other'));
+            ALTER TABLE resources ADD CONSTRAINT resources_category_check CHECK (category IN ('Lecture','Exam','Material','Quiz','Homework','Other'));
         `);
         console.log("✓ DB migrations applied");
     } catch (err) {
@@ -140,7 +143,8 @@ app.get("/courses", async (_req, res) => {
         const { rows } = await pool.query(
             `SELECT course_id AS course_name, title, description, level, credits,
               difficulty, prerequisites, objectives, books,
-              major_1_date, major_2_date, final_date
+              major_1_date, major_2_date, final_date,
+              syllabus, industry_overview
        FROM courses
        ORDER BY level, course_id`
         );
@@ -162,7 +166,8 @@ app.get("/courses/:courseId", async (req, res) => {
         const { rows } = await pool.query(
             `SELECT course_id AS course_name, title, description, level, credits,
               difficulty, prerequisites, objectives, books,
-              major_1_date, major_2_date, final_date
+              major_1_date, major_2_date, final_date,
+              syllabus, industry_overview
        FROM courses WHERE course_id = $1`,
             [req.params.courseId]
         );
@@ -178,7 +183,8 @@ app.get("/courses/:courseId", async (req, res) => {
 /** POST /courses — create a course */
 app.post("/courses", async (req, res) => {
     const { course_id, title, description, level, credits, difficulty,
-        prerequisites, objectives, books, major_1_date, major_2_date, final_date } = req.body;
+        prerequisites, objectives, books, major_1_date, major_2_date, final_date,
+        syllabus, industry_overview } = req.body;
     try {
         // Validate required fields
         if (!course_id || !title || level === undefined) {
@@ -204,15 +210,17 @@ app.post("/courses", async (req, res) => {
 
         const { rows } = await pool.query(
             `INSERT INTO courses (course_id, title, description, level, credits, difficulty,
-                            prerequisites, objectives, books, major_1_date, major_2_date, final_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                            prerequisites, objectives, books, major_1_date, major_2_date, final_date,
+                            syllabus, industry_overview)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
             [course_id, title, description, level, credits, difficulty,
                 prereqStr, objStr, JSON.stringify(books),
-                major_1_date || null, major_2_date || null, final_date || null]
+                major_1_date || null, major_2_date || null, final_date || null,
+                syllabus || null, industry_overview || null]
         );
-        res.status(201).json(rows[0]);
         await delCache("all_courses");
+        res.status(201).json(rows[0]);
     } catch (err) {
         const errorMsg = err.detail || err.message || JSON.stringify(err);
         console.error("Course creation error:", errorMsg);
@@ -223,7 +231,8 @@ app.post("/courses", async (req, res) => {
 /** PUT /courses/:courseId */
 app.put("/courses/:courseId", async (req, res) => {
     const { title, description, level, credits, difficulty,
-        prerequisites, objectives, books, major_1_date, major_2_date, final_date } = req.body;
+        prerequisites, objectives, books, major_1_date, major_2_date, final_date,
+        syllabus, industry_overview } = req.body;
     try {
         if (!title || level === undefined) {
             return res.status(400).json({ error: "title and level are required" });
@@ -235,16 +244,18 @@ app.put("/courses/:courseId", async (req, res) => {
         const { rows } = await pool.query(
             `UPDATE courses SET title=$1, description=$2, level=$3, credits=$4, difficulty=$5,
         prerequisites=$6, objectives=$7, books=$8,
-        major_1_date=$9, major_2_date=$10, final_date=$11
-       WHERE course_id=$12 RETURNING *`,
+        major_1_date=$9, major_2_date=$10, final_date=$11,
+        syllabus=$12, industry_overview=$13
+       WHERE course_id=$14 RETURNING *`,
             [title, description, level, credits, difficulty,
                 prereqStr, objStr, JSON.stringify(books),
                 major_1_date || null, major_2_date || null, final_date || null,
+                syllabus ?? null, industry_overview ?? null,
                 req.params.courseId]
         );
         if (!rows.length) return res.status(404).json({ error: "Course not found" });
-        res.json(rows[0]);
         await delCache("all_courses");
+        res.json(rows[0]);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Failed to update course" });
@@ -277,7 +288,7 @@ app.get("/resources", async (req, res) => {
             query += " WHERE course_id = $1";
             params.push(courseId);
         }
-        query += " ORDER BY id";
+        query += " ORDER BY sort_order ASC, id ASC";
         const { rows } = await pool.query(query, params);
         res.json(rows);
     } catch (err) {
@@ -288,12 +299,12 @@ app.get("/resources", async (req, res) => {
 
 /** POST /api/resources */
 app.post("/resources", async (req, res) => {
-    const { course_id, resource_title, url, category, sub_category, semester, chapter, unit } = req.body;
+    const { course_id, resource_title, url, category, sub_category, semester, chapter, unit, sort_order } = req.body;
     try {
         const { rows } = await pool.query(
-            `INSERT INTO resources (course_id, resource_title, url, category, sub_category, semester, chapter, unit)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-            [course_id, resource_title, url, category, sub_category || null, semester || null, chapter || null, unit || null]
+            `INSERT INTO resources (course_id, resource_title, url, category, sub_category, semester, chapter, unit, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+            [course_id, resource_title, url, category, sub_category || null, semester || null, chapter || null, unit || null, Number.isFinite(sort_order) ? sort_order : 0]
         );
         res.status(201).json(rows[0]);
     } catch (err) {
@@ -304,13 +315,13 @@ app.post("/resources", async (req, res) => {
 
 /** PUT /api/resources/:id */
 app.put("/resources/:id", async (req, res) => {
-    const { resource_title, url, category, sub_category, semester, chapter, unit } = req.body;
+    const { resource_title, url, category, sub_category, semester, chapter, unit, sort_order } = req.body;
     try {
         const { rows } = await pool.query(
             `UPDATE resources SET resource_title=$1, url=$2, category=$3,
-        sub_category=$4, semester=$5, chapter=$6, unit=$7
-       WHERE id=$8 RETURNING *`,
-            [resource_title, url, category, sub_category || null, semester || null, chapter || null, unit || null, req.params.id]
+        sub_category=$4, semester=$5, chapter=$6, unit=$7, sort_order=$8
+       WHERE id=$9 RETURNING *`,
+            [resource_title, url, category, sub_category || null, semester || null, chapter || null, unit || null, sort_order ?? 0, req.params.id]
         );
         if (!rows.length) return res.status(404).json({ error: "Resource not found" });
         res.json(rows[0]);

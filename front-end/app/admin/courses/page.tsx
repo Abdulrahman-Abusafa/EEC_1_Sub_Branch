@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown, HelpCircle, UploadCloud, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown, ChevronUp, HelpCircle, UploadCloud, CheckCircle2, AlertCircle, Info, ClipboardList } from "lucide-react";
 import { fetchCourseResources, createResource, deleteResource, Resource, API_BASE } from "@/lib/api";
 
 const MAX_PDF_MB = 200;
@@ -95,6 +95,8 @@ type Course = {
   prerequisites: string[];
   objectives: string[];
   books: BookItem[];
+  syllabus?: string | null;
+  industry_overview?: string | null;
 };
 
 export default function CoursesAdmin() {
@@ -112,6 +114,8 @@ export default function CoursesAdmin() {
   const [difficulty, setDifficulty] = useState(3.0);
   const [prereqStr, setPrereqStr] = useState("");
   const [objStr, setObjStr] = useState("");
+  const [syllabus, setSyllabus] = useState("");
+  const [industryOverview, setIndustryOverview] = useState("");
   const [books, setBooks] = useState<BookItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -126,6 +130,10 @@ export default function CoursesAdmin() {
   type ListBookNote  = { type: 'list'; groupTitle: string; items: { title: string; url: string; file?: File }[] };
   type BookNoteEntry = SingleBookNote | ListBookNote;
   const [booksAndNotes, setBooksAndNotes] = useState<BookNoteEntry[]>([]);
+  type SingleHomework = { type: 'single'; title: string; url: string; file?: File };
+  type HomeworkFolder = { type: 'folder'; folderName: string; items: ExamFileItem[] };
+  type HomeworkEntry = SingleHomework | HomeworkFolder;
+  const [homeworks, setHomeworks] = useState<HomeworkEntry[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<number, boolean>>({});
   type SingleExamItem = { type: 'single'; term: string; url: string; file?: File };
   type ExamFolderItem = { type: 'folder'; folderName: string; items: ExamFileItem[] };
@@ -136,7 +144,7 @@ export default function CoursesAdmin() {
   const [oldExams, setOldExams] = useState<{ major1: ExamEntry[]; major2: ExamEntry[]; final: ExamEntry[] }>({ major1: [], major2: [], final: [] });
   const [byChapter, setByChapter] = useState<ChapterEntry[]>([]);
   const [collapsedExamFolders, setCollapsedExamFolders] = useState<Record<string, boolean>>({});
-  const [collapsedExams, setCollapsedExams] = useState<Record<string, boolean>>({ major1: true, major2: true, final: true, byChapter: true, quizzes: true, videos: true });
+  const [collapsedExams, setCollapsedExams] = useState<Record<string, boolean>>({ major1: true, major2: true, final: true, byChapter: true, quizzes: true, videos: true, homeworks: true });
 
   // Toasts
   type Toast = { id: number; type: 'success' | 'error' | 'info'; message: string };
@@ -208,6 +216,8 @@ export default function CoursesAdmin() {
       const quizFolders: Record<string, ExamFileItem[]> = {};
       const booksAndNotesEntries: BookNoteEntry[] = [];
       const listGroups: Record<string, { title: string; url: string }[]> = {};
+      const homeworkEntries: HomeworkEntry[] = [];
+      const homeworkFolders: Record<string, ExamFileItem[]> = {};
       const examBuckets: { major1: Record<string, ExamFileItem[]>; major2: Record<string, ExamFileItem[]>; final: Record<string, ExamFileItem[]> } = { major1: {}, major2: {}, final: {} };
       const chapterBuckets: Record<string, ExamFileItem[]> = {};
       const examSubCatToKey: Record<string, 'major1' | 'major2' | 'final'> = { 'Major 1': 'major1', 'Major 2': 'major2', 'Final': 'final' };
@@ -229,6 +239,13 @@ export default function CoursesAdmin() {
           } else {
             booksAndNotesEntries.push({ type: 'single', title: resource.resource_title, url: resource.url });
           }
+        } else if (resource.sub_category === 'Homeworks') {
+          if (resource.unit) {
+            if (!homeworkFolders[resource.unit]) homeworkFolders[resource.unit] = [];
+            homeworkFolders[resource.unit].push({ title: resource.resource_title, url: resource.url });
+          } else {
+            homeworkEntries.push({ type: 'single', title: resource.resource_title, url: resource.url });
+          }
         } else if (resource.sub_category && examSubCatToKey[resource.sub_category]) {
           const key = examSubCatToKey[resource.sub_category];
           const bucketKey = resource.semester || '';
@@ -247,6 +264,10 @@ export default function CoursesAdmin() {
 
       Object.entries(quizFolders).forEach(([folderName, items]) => {
         quizEntries.push({ type: 'folder', folderName, items });
+      });
+
+      Object.entries(homeworkFolders).forEach(([folderName, items]) => {
+        homeworkEntries.push({ type: 'folder', folderName, items });
       });
 
       const examsData: { major1: ExamEntry[]; major2: ExamEntry[]; final: ExamEntry[] } = { major1: [], major2: [], final: [] };
@@ -272,6 +293,7 @@ export default function CoursesAdmin() {
       setVideos(videosList);
       setQuizzes(quizEntries);
       setBooksAndNotes(booksAndNotesEntries);
+      setHomeworks(homeworkEntries);
       setOldExams(examsData);
       setByChapter(byChapterEntries);
     } catch (e) {
@@ -292,10 +314,13 @@ export default function CoursesAdmin() {
     setDifficulty(3.0);
     setPrereqStr("");
     setObjStr("");
+    setSyllabus("");
+    setIndustryOverview("");
     setBooks([]);
     setVideos([]);
     setQuizzes([]);
     setBooksAndNotes([]);
+    setHomeworks([]);
     setOldExams({ major1: [], major2: [], final: [] });
     setByChapter([]);
     setEditingCourseId(null);
@@ -316,6 +341,8 @@ export default function CoursesAdmin() {
     setDifficulty(typeof c.difficulty === 'string' ? parseFloat(c.difficulty) : c.difficulty || 3.0);
     setPrereqStr(Array.isArray(c.prerequisites) ? c.prerequisites.join(", ") : c.prerequisites || "");
     setObjStr(Array.isArray(c.objectives) ? c.objectives.join("\n") : c.objectives || "");
+    setSyllabus(c.syllabus || "");
+    setIndustryOverview(c.industry_overview || "");
     setBooks(c.books || []);
     
     // Load existing resources into structured format
@@ -383,7 +410,9 @@ export default function CoursesAdmin() {
         difficulty: Number(difficulty),
         prerequisites: prereqStr.split(",").map(s => s.trim()).filter(Boolean),
         objectives: objStr.split("\n").map(s => s.trim()).filter(Boolean),
-        books: processedBooks as Array<{ title: string; url: string }>
+        books: processedBooks as Array<{ title: string; url: string }>,
+        syllabus,
+        industry_overview: industryOverview
       };
 
       const url = editingCourseId
@@ -447,6 +476,7 @@ export default function CoursesAdmin() {
       let filesTotal = 0;
       quizzes.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
       booksAndNotes.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
+      homeworks.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
       Object.values(oldExams).forEach(entries => entries.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++)));
       byChapter.forEach(e => e.type === 'single' ? (e.file && filesTotal++) : e.items.forEach(it => it.file && filesTotal++));
 
@@ -468,6 +498,11 @@ export default function CoursesAdmin() {
         }
       };
 
+      // Running sort_order counter — increments per pushed resource row, not per
+      // entry, so files inside a folder get distinct values. groupResources()
+      // buckets by category before rendering, so cross-section values never collide.
+      let order = 0;
+
       // Add videos
       videos.forEach(video => {
         allResources.push({
@@ -475,7 +510,8 @@ export default function CoursesAdmin() {
           resource_title: video.title,
           url: video.url,
           category: 'Lecture',
-          sub_category: 'Videos'
+          sub_category: 'Videos',
+          sort_order: order++
         });
       });
 
@@ -487,7 +523,7 @@ export default function CoursesAdmin() {
             url = await doUpload(entry.file, 'Quiz PDF');
           }
           if (!url) continue;
-          allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Quiz', sub_category: 'Quizzes' });
+          allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Quiz', sub_category: 'Quizzes', sort_order: order++ });
         } else {
           for (const item of entry.items) {
             let url = item.url;
@@ -495,7 +531,7 @@ export default function CoursesAdmin() {
               url = await doUpload(item.file, 'Quiz PDF');
             }
             if (!url) continue;
-            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Quiz', sub_category: 'Quizzes', unit: entry.folderName });
+            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Quiz', sub_category: 'Quizzes', unit: entry.folderName, sort_order: order++ });
           }
         }
       }
@@ -508,7 +544,7 @@ export default function CoursesAdmin() {
             url = await doUpload(entry.file, 'Books & Notes PDF');
           }
           if (!url) continue;
-          allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Material', sub_category: 'Books & Notes' });
+          allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Material', sub_category: 'Books & Notes', sort_order: order++ });
         } else {
           for (const item of entry.items) {
             let url = item.url;
@@ -516,7 +552,28 @@ export default function CoursesAdmin() {
               url = await doUpload(item.file, 'Books & Notes PDF');
             }
             if (!url) continue;
-            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Material', sub_category: 'Books & Notes', unit: entry.groupTitle });
+            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Material', sub_category: 'Books & Notes', unit: entry.groupTitle, sort_order: order++ });
+          }
+        }
+      }
+
+      // Add homeworks — upload any new PDF files first
+      for (const entry of homeworks) {
+        if (entry.type === 'single') {
+          let url = entry.url;
+          if (entry.file) {
+            url = await doUpload(entry.file, 'Homework PDF');
+          }
+          if (!url) continue;
+          allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Homework', sub_category: 'Homeworks', sort_order: order++ });
+        } else {
+          for (const item of entry.items) {
+            let url = item.url;
+            if (item.file) {
+              url = await doUpload(item.file, 'Homework PDF');
+            }
+            if (!url) continue;
+            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Homework', sub_category: 'Homeworks', unit: entry.folderName, sort_order: order++ });
           }
         }
       }
@@ -531,7 +588,7 @@ export default function CoursesAdmin() {
               url = await doUpload(entry.file, `${examLabels[key]} Exam PDF`);
             }
             if (!url) continue;
-            allResources.push({ course_id: courseId, resource_title: `${examLabels[key]} Exam - ${entry.term}`, url, category: 'Exam', sub_category: examLabels[key], semester: entry.term });
+            allResources.push({ course_id: courseId, resource_title: `${examLabels[key]} Exam - ${entry.term}`, url, category: 'Exam', sub_category: examLabels[key], semester: entry.term, sort_order: order++ });
           } else {
             for (const item of entry.items) {
               let url = item.url;
@@ -539,7 +596,7 @@ export default function CoursesAdmin() {
                 url = await doUpload(item.file, `${examLabels[key]} Exam PDF`);
               }
               if (!url) continue;
-              allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Exam', sub_category: examLabels[key], semester: entry.folderName });
+              allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Exam', sub_category: examLabels[key], semester: entry.folderName, sort_order: order++ });
             }
           }
         }
@@ -553,7 +610,7 @@ export default function CoursesAdmin() {
             url = await doUpload(entry.file, 'Chapter PDF');
           }
           if (!url) continue;
-          allResources.push({ course_id: courseId, resource_title: entry.chapterName, url, category: 'Exam', sub_category: 'Chapter', chapter: entry.chapterName });
+          allResources.push({ course_id: courseId, resource_title: entry.chapterName, url, category: 'Exam', sub_category: 'Chapter', chapter: entry.chapterName, sort_order: order++ });
         } else {
           for (const item of entry.items) {
             let url = item.url;
@@ -561,19 +618,31 @@ export default function CoursesAdmin() {
               url = await doUpload(item.file, 'Chapter PDF');
             }
             if (!url) continue;
-            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Exam', sub_category: 'Chapter', chapter: entry.folderName });
+            allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Exam', sub_category: 'Chapter', chapter: entry.folderName, sort_order: order++ });
           }
         }
       }
 
-      // Save all resources
-      if (allResources.length > 0) {
-        await Promise.all(allResources.map(resource => createResource(resource)));
+      // Save all resources — sequential, not Promise.all, so sort_order maps to
+      // insertion order deterministically and a single failure doesn't get
+      // swallowed by the outer catch while leaving partial state.
+      for (const resource of allResources) {
+        await createResource(resource);
       }
     } catch (e) {
       console.error('Failed to save resources:', e);
-      // Don't throw - allow course to be saved even if resources fail
+      pushToast('error', 'Failed to save some course resources — they may have been deleted. Please reload and try again.');
     }
+  };
+
+  const moveVideo = (index: number, delta: -1 | 1) => {
+    setVideos(prev => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   };
 
   return (
@@ -705,6 +774,14 @@ export default function CoursesAdmin() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Objectives (one per line)</label>
                       <textarea value={objStr} onChange={e => setObjStr(e.target.value)} rows={3} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" placeholder="Understand X\nAnalyze Y..."></textarea>
                     </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Syllabus</label>
+                      <textarea value={syllabus} onChange={e => setSyllabus(e.target.value)} rows={4} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" placeholder="Course syllabus / topics outline..."></textarea>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Industry Overview</label>
+                      <textarea value={industryOverview} onChange={e => setIndustryOverview(e.target.value)} rows={4} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" placeholder="How this course relates to industry / real-world applications..."></textarea>
+                    </div>
                   </div>
 
   
@@ -770,6 +847,18 @@ export default function CoursesAdmin() {
                                     }}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
                                   />
+                                </div>
+                                <div className="flex flex-col shrink-0">
+                                  <button type="button" disabled={i === 0} onClick={() => moveVideo(i, -1)}
+                                    className="p-0.5 disabled:opacity-25 hover:bg-black/5 dark:hover:bg-white/5 rounded text-gray-600 dark:text-gray-300"
+                                    aria-label="Move video up">
+                                    <ChevronUp size={14} />
+                                  </button>
+                                  <button type="button" disabled={i === videos.length - 1} onClick={() => moveVideo(i, 1)}
+                                    className="p-0.5 disabled:opacity-25 hover:bg-black/5 dark:hover:bg-white/5 rounded text-gray-600 dark:text-gray-300"
+                                    aria-label="Move video down">
+                                    <ChevronDown size={14} />
+                                  </button>
                                 </div>
                                 <button
                                   type="button"
@@ -934,6 +1023,168 @@ export default function CoursesAdmin() {
                                   <button
                                     type="button"
                                     onClick={() => setQuizzes(prev => prev.map((en, idx) => {
+                                      if (idx !== i || en.type !== 'folder') return en;
+                                      return { ...en, items: [...en.items, { title: '', url: '' }] };
+                                    }))}
+                                    className="mt-1 flex items-center gap-1.5 text-xs text-neon-blue hover:text-neon-blue/80 px-2 py-1.5 rounded transition-colors self-start"
+                                  >
+                                    <Plus size={13} /> Add File
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Homeworks Section */}
+                    <div className="mb-6">
+                      <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                        <ClipboardList size={16} className="text-neon-blue" />
+                        Homeworks Section
+                      </h4>
+                      <div className="border border-neon-blue/20 rounded-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 bg-neon-blue/5">
+                          <button
+                            type="button"
+                            onClick={() => setCollapsedExams(prev => ({ ...prev, homeworks: !prev.homeworks }))}
+                            className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 flex-1 text-left"
+                          >
+                            <ChevronDown size={15} className={`text-neon-blue transition-transform duration-200 ${!collapsedExams.homeworks ? 'rotate-180' : ''}`} />
+                            Homeworks
+                            {homeworks.length > 0 && <span className="text-xs font-mono text-gray-400 dark:text-white/30">{homeworks.reduce((acc, entry) => acc + (entry.type === 'single' ? 1 : entry.items.length), 0)} files</span>}
+                          </button>
+                          {!collapsedExams.homeworks && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setHomeworks(prev => [...prev, { type: 'single', title: "", url: "" }])}
+                                className="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg"
+                              >
+                                + Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setHomeworks(prev => [...prev, { type: 'folder', folderName: '', items: [{ title: '', url: '' }] }])}
+                                className="flex items-center gap-1.5 text-xs bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue px-3 py-1.5 rounded-lg border border-neon-blue/20"
+                              >
+                                <Layers size={13} /> Add Folder
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {!collapsedExams.homeworks && (
+                          <div className="p-3 flex flex-col gap-2">
+                            {homeworks.length === 0 && (
+                              <p className="text-sm text-gray-400 dark:text-gray-500 italic px-1">No homeworks added yet</p>
+                            )}
+                            {homeworks.map((entry, i) => entry.type === 'single' ? (
+                              <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                <div className="flex-1">
+                                  <input
+                                    type="text"
+                                    placeholder="Homework Title (e.g., Homework 1)"
+                                    value={entry.title}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setHomeworks(prev => prev.map((it, idx) => idx === i && it.type === 'single' ? { ...it, title: val } : it));
+                                    }}
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  {entry.url && !entry.file ? (
+                                    <span className="text-xs text-green-500 flex items-center gap-1">✓ Uploaded</span>
+                                  ) : (
+                                    <ExamFileDrop
+                                      selectedFile={entry.file}
+                                      onFile={(file) => setHomeworks(prev => prev.map((it, idx) => idx === i && it.type === 'single' ? { ...it, file } : it))}
+                                      onReject={(msg) => pushToast('error', msg)}
+                                    />
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setHomeworks(prev => prev.filter((_, idx) => idx !== i))}
+                                  className="text-red-500 p-1 hover:bg-red-500/10 rounded shrink-0"
+                                >
+                                  <X size={15} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div key={i} className="border border-neon-blue/20 rounded-xl overflow-hidden">
+                                <div className="flex items-center gap-3 px-4 py-3 bg-neon-blue/5 border-b border-neon-blue/10">
+                                  <Layers size={15} className="text-neon-blue flex-shrink-0" />
+                                  <input
+                                    type="text"
+                                    placeholder="Folder name (e.g. Weekly Homeworks)"
+                                    value={entry.folderName}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setHomeworks(prev => prev.map((it, idx) => idx === i && it.type === 'folder' ? { ...it, folderName: val } : it));
+                                    }}
+                                    className="flex-1 px-3 py-1.5 text-sm font-medium border border-transparent focus:border-neon-blue/40 rounded bg-transparent dark:text-white outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setCollapsedExamFolders(prev => ({ ...prev, [`hw-${i}`]: !prev[`hw-${i}`] }))}
+                                    className="p-1.5 hover:bg-neon-blue/10 rounded text-neon-blue flex-shrink-0"
+                                  >
+                                    <ChevronDown size={15} className={`transition-transform duration-200 ${collapsedExamFolders[`hw-${i}`] ? "-rotate-90" : ""}`} />
+                                  </button>
+                                  <button type="button" onClick={() => setHomeworks(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 p-1.5 hover:bg-red-500/10 rounded flex-shrink-0">
+                                    <X size={15} />
+                                  </button>
+                                </div>
+                                <div className={`p-3 flex flex-col gap-2 ${collapsedExamFolders[`hw-${i}`] ? "hidden" : ""}`}>
+                                  {entry.items.map((item, j) => (
+                                    <div key={j} className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                                      <span className="text-xs font-mono text-gray-400 dark:text-white/30 w-5 text-center">{j + 1}</span>
+                                      <div className="flex-1">
+                                        <input
+                                          type="text"
+                                          placeholder={`File ${j + 1} title`}
+                                          value={item.title}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setHomeworks(prev => prev.map((en, idx) => {
+                                              if (idx !== i || en.type !== 'folder') return en;
+                                              return { ...en, items: en.items.map((it, jdx) => jdx === j ? { ...it, title: val } : it) };
+                                            }));
+                                          }}
+                                          className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-zinc-700 rounded bg-transparent dark:text-white outline-none focus:border-neon-blue"
+                                        />
+                                      </div>
+                                      <div className="flex-1">
+                                        {item.url && !item.file ? (
+                                          <span className="text-xs text-green-500">✓ Uploaded</span>
+                                        ) : (
+                                          <ExamFileDrop
+                                            selectedFile={item.file}
+                                            onFile={(file) => setHomeworks(prev => prev.map((en, idx) => {
+                                              if (idx !== i || en.type !== 'folder') return en;
+                                              return { ...en, items: en.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
+                                            }))}
+                                            onReject={(msg) => pushToast('error', msg)}
+                                          />
+                                        )}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setHomeworks(prev => prev.map((en, idx) => {
+                                          if (idx !== i || en.type !== 'folder') return en;
+                                          return { ...en, items: en.items.filter((_, jdx) => jdx !== j) };
+                                        }))}
+                                        className="text-red-500 p-1 hover:bg-red-500/10 rounded flex-shrink-0"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => setHomeworks(prev => prev.map((en, idx) => {
                                       if (idx !== i || en.type !== 'folder') return en;
                                       return { ...en, items: [...en.items, { title: '', url: '' }] };
                                     }))}

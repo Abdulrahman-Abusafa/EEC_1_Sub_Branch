@@ -1,7 +1,7 @@
 "use client";
 
 import React, { use } from "react";
-import { ArrowLeft, BookOpen, Calculator, CheckCircle2, Play, FileText, Calendar, ChevronDown, HelpCircle } from "lucide-react";
+import { ArrowLeft, BookOpen, Calculator, CheckCircle2, Play, FileText, Calendar, ChevronDown, HelpCircle, Briefcase, ClipboardList } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -24,6 +24,7 @@ type CourseMeta = {
         videos: { title: string; href: string }[];
         quizzes: { title: string; href: string }[];
         booksAndNotes: { title: string; href: string }[];
+        homeworks: { title: string; href: string }[];
         oldExams: {
             major1: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
             major2: { [semester: string]: { [chapter: string]: { title: string; href: string }[] } };
@@ -57,6 +58,7 @@ function groupResources(resources: Resource[]) {
     const videos: { title: string; href: string }[] = [];
     const quizzes: { title: string; href: string }[] = [];
     const booksAndNotes: BookNoteEntry[] = [];
+    const homeworks: { title: string; href: string }[] = [];
     const oldExams: {
         major1: { [semester: string]: { title: string; href: string }[] };
         major2: { [semester: string]: { title: string; href: string }[] };
@@ -75,6 +77,8 @@ function groupResources(resources: Resource[]) {
             videos.push(item);
         } else if (subCat === 'quizzes' || cat === 'quiz') {
             quizzes.push(item);
+        } else if (subCat === 'homeworks' || cat === 'homework') {
+            homeworks.push(item);
         } else if (subCat === 'books & notes' || cat === 'material') {
             if (r.unit) {
                 if (!listGroups[r.unit]) listGroups[r.unit] = [];
@@ -102,7 +106,7 @@ function groupResources(resources: Resource[]) {
         booksAndNotes.push({ type: 'list', groupTitle, items });
     });
 
-    return { videos, quizzes, booksAndNotes, oldExams, byChapter, other };
+    return { videos, quizzes, booksAndNotes, homeworks, oldExams, byChapter, other };
 }
 
 
@@ -331,6 +335,45 @@ function QuizzesSection({ items }: { items: { title: string; href: string }[] })
     );
 }
 
+function HomeworksSection({ items }: { items: { title: string; href: string }[] }) {
+    const [isOpen, setIsOpen] = useState(false);
+    if (!items || items.length === 0) return null;
+
+    return (
+        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 transition-colors h-full flex flex-col">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
+                    <ClipboardList className="w-5 h-5 text-neon-blue" />
+                </div>
+                <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">Homeworks</h3>
+            </div>
+            <div className="rounded-xl border border-neon-blue/20 overflow-hidden">
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(prev => !prev)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-neon-blue/5 hover:bg-neon-blue/10 transition-colors"
+                >
+                    <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white/90">
+                        All Homeworks
+                        <span className="text-xs font-normal text-gray-400 dark:text-white/30 font-mono">{items.length} items</span>
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-neon-blue transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                </button>
+                {isOpen && (
+                    <div className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
+                        {items.map((item, i) => (
+                            <a key={i} href={item.href} target="_blank" rel="noreferrer" className="group flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{item.title}</span>
+                                <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
+                            </a>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function OldExamsSection({ exams, byChapter }: { exams: { major1: { [semester: string]: { title: string; href: string }[] }; major2: { [semester: string]: { title: string; href: string }[] }; final: { [semester: string]: { title: string; href: string }[] } }; byChapter: { title: string; href: string }[] }) {
     const [openTypes, setOpenTypes] = useState<Record<string, boolean>>({});
     const hasExams = Object.values(exams).some(examType => Object.keys(examType).length > 0) || byChapter.length > 0;
@@ -500,7 +543,7 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
   const decodedId = decodeURIComponent(courseId);
 
   const [course, setCourse] = useState<Course | null>(null);
-  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; quizzes: {title:string;href:string}[]; booksAndNotes: BookNoteEntry[]; oldExams: {major1:{[k:string]:{title:string;href:string}[]}; major2:{[k:string]:{title:string;href:string}[]}; final:{[k:string]:{title:string;href:string}[]}}; byChapter: {title:string;href:string}[]; other: {title:string;href:string}[] }>({ videos: [], quizzes: [], booksAndNotes: [], oldExams: {major1:{},major2:{},final:{}}, byChapter: [], other: [] });
+  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; quizzes: {title:string;href:string}[]; booksAndNotes: BookNoteEntry[]; homeworks: {title:string;href:string}[]; oldExams: {major1:{[k:string]:{title:string;href:string}[]}; major2:{[k:string]:{title:string;href:string}[]}; final:{[k:string]:{title:string;href:string}[]}}; byChapter: {title:string;href:string}[]; other: {title:string;href:string}[] }>({ videos: [], quizzes: [], booksAndNotes: [], homeworks: [], oldExams: {major1:{},major2:{},final:{}}, byChapter: [], other: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -579,9 +622,11 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
     : [];
   
   const displayExams = course ? parseDates(course) : { major1: new Date(), major2: new Date(), final: new Date() };
+  const displaySyllabus = course?.syllabus ?? "";
+  const displayIndustryOverview = course?.industry_overview ?? "";
 
   // Alias to avoid conflict with outer local
-  const data = { id: displayId, title: displayTitle, description: displayDesc, level: displayLevel, credits: displayCredits, difficulty: displayDifficulty, objectives: displayObjectives, prerequisites: displayPrereqs, resources, exams: displayExams };
+  const data = { id: displayId, title: displayTitle, description: displayDesc, level: displayLevel, credits: displayCredits, difficulty: displayDifficulty, objectives: displayObjectives, prerequisites: displayPrereqs, resources, exams: displayExams, syllabus: displaySyllabus, industryOverview: displayIndustryOverview };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-deep-space pb-32">
@@ -641,12 +686,37 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
                 </div>
             </div>
 
+            {/* Syllabus & Industry Overview — side by side */}
+            {(data.syllabus || data.industryOverview) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+                    <div className="p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10">
+                        <div className="flex items-center gap-3 mb-6">
+                            <FileText className="w-6 h-6 text-neon-blue" />
+                            <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)]">Syllabus</h2>
+                        </div>
+                        <p className="text-gray-700 dark:text-white/70 leading-relaxed whitespace-pre-line">
+                            {data.syllabus || "No syllabus available."}
+                        </p>
+                    </div>
+                    <div className="p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10">
+                        <div className="flex items-center gap-3 mb-6">
+                            <Briefcase className="w-6 h-6 text-neon-blue" />
+                            <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)]">Industry Overview</h2>
+                        </div>
+                        <p className="text-gray-700 dark:text-white/70 leading-relaxed whitespace-pre-line">
+                            {data.industryOverview || "No industry overview available."}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Course Content Grid */}
             <div>
                 <h2 className="text-3xl font-bold font-[family-name:var(--font-orbitron)] mb-8">Course Resources</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <VideosSection items={data.resources.videos} />
                     <QuizzesSection items={data.resources.quizzes} />
+                    <HomeworksSection items={data.resources.homeworks} />
                     <BooksAndNotesSection items={data.resources.booksAndNotes} />
                     <OldExamsSection exams={data.resources.oldExams} byChapter={data.resources.byChapter} />
                     {data.resources.other && data.resources.other.length > 0 && (
