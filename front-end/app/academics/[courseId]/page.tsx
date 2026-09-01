@@ -54,11 +54,15 @@ type BookNoteEntry =
     | { type: 'single'; title: string; href: string }
     | { type: 'list'; groupTitle: string; items: { title: string; href: string }[] };
 
+type FolderEntry =
+    | { type: 'single'; title: string; href: string }
+    | { type: 'list'; groupTitle: string; items: { title: string; href: string }[] };
+
 function groupResources(resources: Resource[]) {
     const videos: { title: string; href: string }[] = [];
-    const quizzes: { title: string; href: string }[] = [];
+    const quizzes: FolderEntry[] = [];
     const booksAndNotes: BookNoteEntry[] = [];
-    const homeworks: { title: string; href: string }[] = [];
+    const homeworks: FolderEntry[] = [];
     const oldExams: {
         major1: { [semester: string]: { title: string; href: string }[] };
         major2: { [semester: string]: { title: string; href: string }[] };
@@ -67,6 +71,8 @@ function groupResources(resources: Resource[]) {
     const byChapter: { title: string; href: string }[] = [];
     const other: { title: string; href: string }[] = [];
     const listGroups: Record<string, { title: string; href: string }[]> = {};
+    const quizGroups: Record<string, { title: string; href: string }[]> = {};
+    const homeworkGroups: Record<string, { title: string; href: string }[]> = {};
 
     resources.forEach(r => {
         const item = { title: r.resource_title, href: r.url };
@@ -76,9 +82,19 @@ function groupResources(resources: Resource[]) {
         if (subCat === 'videos' || cat === 'lecture') {
             videos.push(item);
         } else if (subCat === 'quizzes' || cat === 'quiz') {
-            quizzes.push(item);
+            if (r.unit) {
+                if (!quizGroups[r.unit]) quizGroups[r.unit] = [];
+                quizGroups[r.unit].push(item);
+            } else {
+                quizzes.push({ type: 'single', ...item });
+            }
         } else if (subCat === 'homeworks' || cat === 'homework') {
-            homeworks.push(item);
+            if (r.unit) {
+                if (!homeworkGroups[r.unit]) homeworkGroups[r.unit] = [];
+                homeworkGroups[r.unit].push(item);
+            } else {
+                homeworks.push({ type: 'single', ...item });
+            }
         } else if (subCat === 'books & notes' || cat === 'material') {
             if (r.unit) {
                 if (!listGroups[r.unit]) listGroups[r.unit] = [];
@@ -104,6 +120,12 @@ function groupResources(resources: Resource[]) {
 
     Object.entries(listGroups).forEach(([groupTitle, items]) => {
         booksAndNotes.push({ type: 'list', groupTitle, items });
+    });
+    Object.entries(quizGroups).forEach(([groupTitle, items]) => {
+        quizzes.push({ type: 'list', groupTitle, items });
+    });
+    Object.entries(homeworkGroups).forEach(([groupTitle, items]) => {
+        homeworks.push({ type: 'list', groupTitle, items });
     });
 
     return { videos, quizzes, booksAndNotes, homeworks, oldExams, byChapter, other };
@@ -296,82 +318,85 @@ function BooksAndNotesSection({ items }: { items: BookNoteEntry[] }) {
     );
 }
 
-function QuizzesSection({ items }: { items: { title: string; href: string }[] }) {
-    const [isOpen, setIsOpen] = useState(false);
+function FolderResourceSection({ items, title, icon: Icon, allLabel }: { items: FolderEntry[]; title: string; icon: import("lucide-react").LucideIcon; allLabel: string }) {
+    const [openSingles, setOpenSingles] = useState(false);
+    const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({});
     if (!items || items.length === 0) return null;
+
+    const singles = items.filter((e): e is { type: 'single'; title: string; href: string } => e.type === 'single');
+    const groups = items.filter((e): e is { type: 'list'; groupTitle: string; items: { title: string; href: string }[] } => e.type === 'list');
 
     return (
         <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 transition-colors h-full flex flex-col">
             <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
-                    <HelpCircle className="w-5 h-5 text-neon-blue" />
+                    <Icon className="w-5 h-5 text-neon-blue" />
                 </div>
-                <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">Quizzes</h3>
+                <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">{title}</h3>
             </div>
-            <div className="rounded-xl border border-neon-blue/20 overflow-hidden">
-                <button
-                    type="button"
-                    onClick={() => setIsOpen(prev => !prev)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-neon-blue/5 hover:bg-neon-blue/10 transition-colors"
-                >
-                    <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white/90">
-                        All Quizzes
-                        <span className="text-xs font-normal text-gray-400 dark:text-white/30 font-mono">{items.length} items</span>
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-neon-blue transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-                </button>
-                {isOpen && (
-                    <div className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
-                        {items.map((item, i) => (
-                            <a key={i} href={item.href} target="_blank" rel="noreferrer" className="group flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                                <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{item.title}</span>
-                                <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
-                            </a>
-                        ))}
+            <div className="flex flex-col gap-3">
+                {singles.length > 0 && (
+                    <div className="rounded-xl border border-neon-blue/20 overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setOpenSingles(prev => !prev)}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-neon-blue/5 hover:bg-neon-blue/10 transition-colors"
+                        >
+                            <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white/90">
+                                {allLabel}
+                                <span className="text-xs font-normal text-gray-400 dark:text-white/30 font-mono">{singles.length} items</span>
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-neon-blue transition-transform duration-200 ${openSingles ? "rotate-180" : ""}`} />
+                        </button>
+                        {openSingles && (
+                            <div className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
+                                {singles.map((item, i) => (
+                                    <a key={i} href={item.href} target="_blank" rel="noreferrer" className="group flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                        <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{item.title}</span>
+                                        <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
+                                    </a>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
+                {groups.map((entry, i) => (
+                    <div key={i} className="rounded-xl border border-neon-blue/20 overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setOpenGroups(prev => ({ ...prev, [i]: !prev[i] }))}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-neon-blue/5 hover:bg-neon-blue/10 transition-colors"
+                        >
+                            <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white/90">
+                                <Icon className="w-4 h-4 text-neon-blue" />
+                                {entry.groupTitle}
+                                <span className="text-xs font-normal text-gray-400 dark:text-white/30 font-mono">{entry.items.length} files</span>
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-neon-blue transition-transform duration-200 ${openGroups[i] ? "rotate-180" : ""}`} />
+                        </button>
+                        {openGroups[i] && (
+                            <div className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
+                                {entry.items.map((item, j) => (
+                                    <a key={j} href={item.href} target="_blank" rel="noreferrer" className="group flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                        <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{item.title}</span>
+                                        <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
         </div>
     );
 }
 
-function HomeworksSection({ items }: { items: { title: string; href: string }[] }) {
-    const [isOpen, setIsOpen] = useState(false);
-    if (!items || items.length === 0) return null;
+function QuizzesSection({ items }: { items: FolderEntry[] }) {
+    return <FolderResourceSection items={items} title="Quizzes" icon={HelpCircle} allLabel="All Quizzes" />;
+}
 
-    return (
-        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 transition-colors h-full flex flex-col">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
-                    <ClipboardList className="w-5 h-5 text-neon-blue" />
-                </div>
-                <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">Homeworks</h3>
-            </div>
-            <div className="rounded-xl border border-neon-blue/20 overflow-hidden">
-                <button
-                    type="button"
-                    onClick={() => setIsOpen(prev => !prev)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-neon-blue/5 hover:bg-neon-blue/10 transition-colors"
-                >
-                    <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white/90">
-                        All Homeworks
-                        <span className="text-xs font-normal text-gray-400 dark:text-white/30 font-mono">{items.length} items</span>
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-neon-blue transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-                </button>
-                {isOpen && (
-                    <div className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
-                        {items.map((item, i) => (
-                            <a key={i} href={item.href} target="_blank" rel="noreferrer" className="group flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                                <span className="text-sm text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{item.title}</span>
-                                <FileText className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue transition-colors flex-shrink-0" />
-                            </a>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+function HomeworksSection({ items }: { items: FolderEntry[] }) {
+    return <FolderResourceSection items={items} title="Homeworks" icon={ClipboardList} allLabel="All Homeworks" />;
 }
 
 function OldExamsSection({ exams, byChapter }: { exams: { major1: { [semester: string]: { title: string; href: string }[] }; major2: { [semester: string]: { title: string; href: string }[] }; final: { [semester: string]: { title: string; href: string }[] } }; byChapter: { title: string; href: string }[] }) {
@@ -543,7 +568,7 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
   const decodedId = decodeURIComponent(courseId);
 
   const [course, setCourse] = useState<Course | null>(null);
-  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; quizzes: {title:string;href:string}[]; booksAndNotes: BookNoteEntry[]; homeworks: {title:string;href:string}[]; oldExams: {major1:{[k:string]:{title:string;href:string}[]}; major2:{[k:string]:{title:string;href:string}[]}; final:{[k:string]:{title:string;href:string}[]}}; byChapter: {title:string;href:string}[]; other: {title:string;href:string}[] }>({ videos: [], quizzes: [], booksAndNotes: [], homeworks: [], oldExams: {major1:{},major2:{},final:{}}, byChapter: [], other: [] });
+  const [resources, setResources] = useState<{ videos: {title:string;href:string}[]; quizzes: FolderEntry[]; booksAndNotes: BookNoteEntry[]; homeworks: FolderEntry[]; oldExams: {major1:{[k:string]:{title:string;href:string}[]}; major2:{[k:string]:{title:string;href:string}[]}; final:{[k:string]:{title:string;href:string}[]}}; byChapter: {title:string;href:string}[]; other: {title:string;href:string}[] }>({ videos: [], quizzes: [], booksAndNotes: [], homeworks: [], oldExams: {major1:{},major2:{},final:{}}, byChapter: [], other: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
