@@ -158,6 +158,11 @@ async function seed() {
     ];
 
     for (const e of events) {
+      const { rows: existing } = await client.query(
+        `SELECT 1 FROM events WHERE event_title = $1 AND start_date = $2`,
+        [e.event_title, e.start_date]
+      );
+      if (existing.length) continue;
       await client.query(
         `INSERT INTO events (event_title, description, category, location, time, start_date, end_date, status, registration_link)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,

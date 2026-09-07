@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown, ChevronUp, HelpCircle, UploadCloud, CheckCircle2, AlertCircle, Info, ClipboardList } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown, ChevronUp, HelpCircle, UploadCloud, CheckCircle2, AlertCircle, Info, ClipboardList, FolderUp, FileArchive } from "lucide-react";
 import { fetchCourseResources, createResource, deleteResource, Resource, API_BASE } from "@/lib/api";
 
 const MAX_PDF_MB = 200;
@@ -80,6 +80,107 @@ function ExamFileDrop({ selectedFile, onFile, onReject }: { selectedFile?: File;
         className="hidden"
       />
     </div>
+  );
+}
+
+type BulkImportItem = { title: string; url: string; file: File };
+
+/**
+ * Lets an admin bulk-import a batch of PDFs at once, either by selecting an
+ * entire folder (using the non-standard `webkitdirectory` file input attribute)
+ * or by uploading a .zip archive (unpacked client-side with JSZip). The
+ * resulting files are handed back as ready-to-upload items so callers can
+ * drop them straight into a "folder"/"list" resource entry.
+ */
+function BulkImportButtons({
+  onImport,
+  onError,
+}: {
+  onImport: (name: string, items: BulkImportItem[]) => void;
+  onError: (msg: string) => void;
+}) {
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const looksLikePdf = (name: string) => name.toLowerCase().endsWith(".pdf");
+  const stripExt = (name: string) => name.replace(/\.pdf$/i, "");
+
+  const handleFolderChange = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList).filter((f) => looksLikePdf(f.name));
+    if (files.length === 0) {
+      onError("No PDF files found in the selected folder");
+      return;
+    }
+    const items: BulkImportItem[] = files.map((f) => ({ title: stripExt(f.name), url: "", file: f }));
+    const first = fileList[0] as File & { webkitRelativePath?: string };
+    const name = first.webkitRelativePath ? first.webkitRelativePath.split("/")[0] : "Imported Folder";
+    onImport(name, items);
+  };
+
+  const handleZipChange = async (fileList: FileList | null) => {
+    const zipFile = fileList?.[0];
+    if (!zipFile) return;
+    setBusy(true);
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = await JSZip.loadAsync(zipFile);
+      const entries = Object.values(zip.files).filter((f) => !f.dir && looksLikePdf(f.name));
+      if (entries.length === 0) {
+        onError("No PDF files found in the ZIP");
+        return;
+      }
+      const items: BulkImportItem[] = [];
+      for (const entry of entries) {
+        const blob = await entry.async("blob");
+        const name = entry.name.split("/").pop() || entry.name;
+        items.push({ title: stripExt(name), url: "", file: new File([blob], name, { type: "application/pdf" }) });
+      }
+      onImport(zipFile.name.replace(/\.zip$/i, ""), items);
+    } catch {
+      onError("Failed to read ZIP file — make sure it's a valid archive");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => folderInputRef.current?.click()}
+        className="flex items-center gap-1.5 text-xs bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 px-3 py-1.5 rounded-lg border border-indigo-500/20 disabled:opacity-50"
+      >
+        <FolderUp size={13} /> Upload Folder
+      </button>
+      <input
+        ref={folderInputRef}
+        type="file"
+        multiple
+        // @ts-expect-error non-standard attributes used to let the browser pick a whole folder
+        webkitdirectory=""
+        directory=""
+        className="hidden"
+        onChange={(e) => { handleFolderChange(e.target.files); e.target.value = ""; }}
+      />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => zipInputRef.current?.click()}
+        className="flex items-center gap-1.5 text-xs bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 px-3 py-1.5 rounded-lg border border-indigo-500/20 disabled:opacity-50"
+      >
+        <FileArchive size={13} /> {busy ? "Extracting…" : "Upload ZIP"}
+      </button>
+      <input
+        ref={zipInputRef}
+        type="file"
+        accept=".zip,application/zip,application/x-zip-compressed"
+        className="hidden"
+        onChange={(e) => { handleZipChange(e.target.files); e.target.value = ""; }}
+      />
+    </>
   );
 }
 
@@ -1032,6 +1133,10 @@ export default function CoursesAdmin() {
                               >
                                 <Layers size={13} /> Add Folder
                               </button>
+                              <BulkImportButtons
+                                onImport={(name, items) => setQuizzes(prev => [...prev, { type: 'folder', folderName: name, items }])}
+                                onError={(msg) => pushToast('error', msg)}
+                              />
                             </div>
                           )}
                         </div>
@@ -1199,6 +1304,10 @@ export default function CoursesAdmin() {
                               >
                                 <Layers size={13} /> Add Folder
                               </button>
+                              <BulkImportButtons
+                                onImport={(name, items) => setHomeworks(prev => [...prev, { type: 'folder', folderName: name, items }])}
+                                onError={(msg) => pushToast('error', msg)}
+                              />
                             </div>
                           )}
                         </div>
@@ -1353,6 +1462,10 @@ export default function CoursesAdmin() {
                           >
                             <Layers size={13} /> Add List
                           </button>
+                          <BulkImportButtons
+                            onImport={(name, items) => setBooksAndNotes(prev => [...prev, { type: 'list', groupTitle: name, items }])}
+                            onError={(msg) => pushToast('error', msg)}
+                          />
                         </div>
                       </div>
 
@@ -1546,6 +1659,10 @@ export default function CoursesAdmin() {
                                   >
                                     <Layers size={13} /> Add Folder
                                   </button>
+                                  <BulkImportButtons
+                                    onImport={(name, items) => setOldExams(prev => ({ ...prev, [examType]: [...prev[examType], { type: 'folder', folderName: name, items }] }))}
+                                    onError={(msg) => pushToast('error', msg)}
+                                  />
                                 </div>
                               )}
                             </div>
@@ -1696,6 +1813,10 @@ export default function CoursesAdmin() {
                                 className="flex items-center gap-1.5 text-xs bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue px-3 py-1.5 rounded-lg border border-neon-blue/20">
                                 <Layers size={13} /> Add Folder
                               </button>
+                              <BulkImportButtons
+                                onImport={(name, items) => setByChapter(prev => [...prev, { type: 'folder', folderName: name, items }])}
+                                onError={(msg) => pushToast('error', msg)}
+                              />
                             </div>
                           )}
                         </div>

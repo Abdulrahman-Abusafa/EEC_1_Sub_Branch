@@ -142,13 +142,6 @@ function EventCard({ event, index, status }: { event: Event; index: number; stat
                         </div>
 
                         <div className={`mt-auto pt-4 border-t flex justify-end ${status === "current" ? "border-neon-blue/20" : "border-black/10 dark:border-white/10"}`}>
-                            {status === "future" && (
-                                <a href={event.registration_link || "#"} target="_blank" rel="noreferrer"
-                                    className="flex items-center gap-2 text-sm font-semibold text-indigo-500 dark:text-indigo-400 hover:text-indigo-300 transition-colors group/btn">
-                                    Register Now
-                                    <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                                </a>
-                            )}
                             {status === "current" && (
                                 <a href={event.registration_link || "#"} target="_blank" rel="noreferrer"
                                     className="flex items-center gap-2 text-sm font-bold text-neon-blue hover:text-neon-blue/80 transition-colors group/btn">

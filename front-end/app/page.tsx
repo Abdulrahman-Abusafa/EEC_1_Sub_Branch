@@ -25,7 +25,7 @@ export default function Home() {
     useEffect(() => {
         fetchEvents().then(evts => {
             const active = evts.filter(e => e.status?.toLowerCase() !== "ended");
-            setSliderEvents([...active, ...active]);
+            setSliderEvents(active);
         });
         Promise.all([fetchMembers(), fetchTerms()]).then(([allMembers, terms]) => {
             const currentTerm = terms.find(t => t.is_current);
@@ -126,8 +126,8 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* Events Autoslider */}
-      <section className="w-full relative overflow-hidden flex flex-col gap-6">
+      {/* Upcoming Events */}
+      <section className="w-full relative flex flex-col gap-6">
          <div className="flex items-center justify-between z-10">
             <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)] text-gray-800 dark:text-white/80">
                 Upcoming Events
@@ -137,15 +137,8 @@ export default function Home() {
             </Link>
          </div>
 
-         <div className="relative w-full overflow-hidden flex items-center">
-            {/* Shadows for edge fade effect */}
-            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
-                        <motion.div
-                className="flex gap-6 w-max"
-                animate={{ x: ["0%", "-50%"] }}
-                transition={{ repeat: Infinity, ease: "linear", duration: 25 }}
-            >
+         <div className="relative w-full overflow-x-auto">
+            <div className="flex gap-6 w-max">
                 {sliderEvents.map((evt, idx) => {
                     const imgUrl = getPhotoUrl(evt.image);
                     const isLive = evt.status?.toLowerCase() === "active";
@@ -197,13 +190,13 @@ export default function Home() {
                         </a>
                     );
                 })}
-            </motion.div>
+            </div>
          </div>
       </section>
 
-      {/* Current Members Autoslider */}
+      {/* Current Members */}
       {sliderMembers.length > 0 && (
-        <section className="w-full relative overflow-hidden flex flex-col gap-6">
+        <section className="w-full relative flex flex-col gap-6">
           <div className="flex items-center justify-between z-10">
             <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)] text-gray-800 dark:text-white/80">
               Current Members
@@ -213,15 +206,8 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="relative w-full overflow-hidden flex items-center">
-            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-gray-50 dark:from-deep-space to-transparent z-10 pointer-events-none" />
-            <motion.div
-              className="flex gap-6 w-max"
-              initial={{ x: "100vw" }}
-              animate={{ x: "-100%" }}
-              transition={{ repeat: Infinity, ease: "linear", duration: 20 }}
-            >
+          <div className="relative w-full overflow-x-auto">
+            <div className="flex gap-6 w-max">
               {sliderMembers.map((member, idx) => {
                 const imgUrl = getPhotoUrl(member.image);
                 return (
@@ -244,7 +230,7 @@ export default function Home() {
                   </Link>
                 );
               })}
-            </motion.div>
+            </div>
           </div>
         </section>
       )}
