@@ -105,18 +105,27 @@ function BulkImportButtons({
 
   const looksLikePdf = (name: string) => name.toLowerCase().endsWith(".pdf");
   const stripExt = (name: string) => name.replace(/\.pdf$/i, "");
+  const maxBytes = MAX_PDF_MB * 1024 * 1024;
 
   const handleFolderChange = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
-    const files = Array.from(fileList).filter((f) => looksLikePdf(f.name));
-    if (files.length === 0) {
-      onError("No PDF files found in the selected folder");
+    const all = Array.from(fileList);
+    const pdfs = all.filter((f) => looksLikePdf(f.name));
+    const valid = pdfs.filter((f) => f.size <= maxBytes);
+    if (valid.length === 0) {
+      onError(
+        pdfs.length === 0
+          ? "No PDF files found in the selected folder"
+          : `All PDFs in that folder are over the ${MAX_PDF_MB} MB limit`
+      );
       return;
     }
-    const items: BulkImportItem[] = files.map((f) => ({ title: stripExt(f.name), url: "", file: f }));
+    const items: BulkImportItem[] = valid.map((f) => ({ title: stripExt(f.name), url: "", file: f }));
     const first = fileList[0] as File & { webkitRelativePath?: string };
     const name = first.webkitRelativePath ? first.webkitRelativePath.split("/")[0] : "Imported Folder";
     onImport(name, items);
+    const skipped = all.length - valid.length;
+    if (skipped > 0) onError(`Imported ${valid.length} PDF(s) — skipped ${skipped} file(s) (not a PDF or over ${MAX_PDF_MB} MB)`);
   };
 
   const handleZipChange = async (fileList: FileList | null) => {
@@ -126,18 +135,29 @@ function BulkImportButtons({
     try {
       const JSZip = (await import("jszip")).default;
       const zip = await JSZip.loadAsync(zipFile);
-      const entries = Object.values(zip.files).filter((f) => !f.dir && looksLikePdf(f.name));
-      if (entries.length === 0) {
+      const allEntries = Object.values(zip.files).filter((f) => !f.dir);
+      const pdfEntries = allEntries.filter((f) => looksLikePdf(f.name));
+      if (pdfEntries.length === 0) {
         onError("No PDF files found in the ZIP");
         return;
       }
       const items: BulkImportItem[] = [];
-      for (const entry of entries) {
+      let skipped = 0;
+      for (const entry of pdfEntries) {
         const blob = await entry.async("blob");
+        if (blob.size > maxBytes) {
+          skipped++;
+          continue;
+        }
         const name = entry.name.split("/").pop() || entry.name;
         items.push({ title: stripExt(name), url: "", file: new File([blob], name, { type: "application/pdf" }) });
       }
+      if (items.length === 0) {
+        onError(`All PDFs in that ZIP are over the ${MAX_PDF_MB} MB limit`);
+        return;
+      }
       onImport(zipFile.name.replace(/\.zip$/i, ""), items);
+      if (skipped > 0) onError(`Imported ${items.length} PDF(s) — skipped ${skipped} file(s) over ${MAX_PDF_MB} MB`);
     } catch {
       onError("Failed to read ZIP file — make sure it's a valid archive");
     } finally {
@@ -1496,17 +1516,10 @@ export default function CoursesAdmin() {
                               {entry.url && !entry.file ? (
                                 <span className="text-xs text-green-500 flex items-center gap-1">✓ Uploaded</span>
                               ) : (
-                                <input
-                                  type="file"
-                                  accept="application/pdf"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
-                                    const next = [...booksAndNotes];
-                                    next[i] = { ...(next[i] as SingleBookNote), file };
-                                    setBooksAndNotes(next);
-                                  }}
-                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                <ExamFileDrop
+                                  selectedFile={entry.file}
+                                  onFile={(file) => setBooksAndNotes(prev => prev.map((it, idx) => idx === i && it.type === 'single' ? { ...it, file } : it))}
+                                  onReject={(msg) => pushToast('error', msg)}
                                 />
                               )}
                             </div>
@@ -1571,19 +1584,14 @@ export default function CoursesAdmin() {
                                     {item.url && !item.file ? (
                                       <span className="text-xs text-green-500">✓ Uploaded</span>
                                     ) : (
-                                      <input
-                                        type="file"
-                                        accept="application/pdf"
-                                        onChange={(e) => {
-                                          const file = e.target.files?.[0];
-                                          if (!file) return;
-                                          setBooksAndNotes(prev => prev.map((en, idx) => {
-                                            if (idx !== i) return en;
-                                            const l = en as ListBookNote;
-                                            return { ...l, items: l.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
-                                          }));
-                                        }}
-                                        className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 dark:file:bg-zinc-700 dark:file:text-white"
+                                      <ExamFileDrop
+                                        selectedFile={item.file}
+                                        onFile={(file) => setBooksAndNotes(prev => prev.map((en, idx) => {
+                                          if (idx !== i) return en;
+                                          const l = en as ListBookNote;
+                                          return { ...l, items: l.items.map((it, jdx) => jdx === j ? { ...it, file } : it) };
+                                        }))}
+                                        onReject={(msg) => pushToast('error', msg)}
                                       />
                                     )}
                                   </div>
