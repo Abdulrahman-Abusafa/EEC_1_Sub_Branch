@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, X, Image as ImageIcon, Star, ChevronDown, ChevronUp } from "lucide-react";
+import Image from "next/image";
 import { API_BASE, getPhotoUrl } from "@/lib/api";
 
 type Term = { id: number; name: string; is_current: boolean };
@@ -207,7 +208,7 @@ export default function MembersAdmin() {
         <div className="text-center py-16 text-gray-400">Loading...</div>
       ) : terms.length === 0 ? (
         <div className="text-center py-16 text-gray-400 dark:text-white/30 font-mono">
-          No academic years yet. Click "Add Academic Year" to get started.
+          No academic years yet. Click &ldquo;Add Academic Year&rdquo; to get started.
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -267,7 +268,7 @@ export default function MembersAdmin() {
                 {!isCollapsed && (
                   termMembers.length === 0 ? (
                     <div className="px-6 py-8 text-center text-gray-400 dark:text-white/30 font-mono text-sm">
-                      No members yet — click "Add Member" above.
+                      No members yet — click &ldquo;Add Member&rdquo; above.
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -287,9 +288,9 @@ export default function MembersAdmin() {
                               <tr key={member.id} className="border-b border-gray-50 dark:border-zinc-800/50 hover:bg-gray-50 dark:hover:bg-zinc-800/20 transition last:border-0">
                                 <td className="px-6 py-3">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-zinc-700 flex items-center justify-center border border-gray-200 dark:border-zinc-600">
+                                    <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-zinc-700 flex items-center justify-center border border-gray-200 dark:border-zinc-600">
                                       {imgUrl
-                                        ? <img src={imgUrl} alt={member.name} className="w-full h-full object-cover" />
+                                        ? <Image src={imgUrl} alt={member.name} fill className="object-cover" />
                                         : <ImageIcon size={18} className="text-gray-400" />}
                                     </div>
                                     <div>
@@ -346,16 +347,16 @@ export default function MembersAdmin() {
                         <tr key={member.id} className="border-b border-gray-50 dark:border-zinc-800/50 hover:bg-gray-50 dark:hover:bg-zinc-800/20 transition last:border-0">
                           <td className="px-6 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-zinc-700 flex items-center justify-center border border-gray-200 dark:border-zinc-600">
+                              <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-zinc-700 flex items-center justify-center border border-gray-200 dark:border-zinc-600">
                                 {imgUrl
-                                  ? <img src={imgUrl} alt={member.name} className="w-full h-full object-cover" />
+                                  ? <Image src={imgUrl} alt={member.name} fill className="object-cover" />
                                   : <ImageIcon size={18} className="text-gray-400" />}
                               </div>
                               <p className="font-medium text-gray-800 dark:text-gray-200">{member.name}</p>
                             </div>
                           </td>
                           <td className="px-6 py-3 text-gray-600 dark:text-gray-400 text-sm">{member.role}</td>
-                          <td className="px-6 py-3 text-amber-500 text-sm font-mono">"{member.term}"</td>
+                          <td className="px-6 py-3 text-amber-500 text-sm font-mono">&ldquo;{member.term}&rdquo;</td>
                           <td className="px-6 py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button onClick={() => openEditMemberModal(member)} className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition">
@@ -443,9 +444,9 @@ export default function MembersAdmin() {
                 {/* Current image preview */}
                 {editingMember && (
                   <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-zinc-800 rounded-xl">
-                    <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-zinc-700 flex items-center justify-center border border-gray-200 dark:border-zinc-600">
+                    <div className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-zinc-700 flex items-center justify-center border border-gray-200 dark:border-zinc-600">
                       {getPhotoUrl(editingMember.image)
-                        ? <img src={getPhotoUrl(editingMember.image)!} alt={editingMember.name} className="w-full h-full object-cover" />
+                        ? <Image src={getPhotoUrl(editingMember.image)!} alt={editingMember.name} fill className="object-cover" />
                         : <ImageIcon size={22} className="text-gray-400" />}
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Current photo — upload below to replace</p>

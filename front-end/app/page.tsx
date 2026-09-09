@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Zap, Calendar, User } from "lucide-react";
 
 import { motion, useMotionValue, useTransform } from "framer-motion";
@@ -154,10 +155,11 @@ export default function Home() {
                             className="flex-shrink-0 w-80 h-48 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group relative overflow-hidden backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] block"
                         >
                             {imgUrl && (
-                                <img
+                                <Image
                                     src={imgUrl}
                                     alt={evt.event_title}
-                                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60 mix-blend-overlay dark:opacity-40"
+                                    fill
+                                    className="object-cover group-hover:scale-110 transition-transform duration-700 opacity-60 mix-blend-overlay dark:opacity-40"
                                 />
                             )}
                             {/* Gradient Overlay */}
@@ -216,9 +218,9 @@ export default function Home() {
                     href="/about"
                     className="flex-shrink-0 w-64 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-neon-blue/50 transition-colors group backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] flex flex-col items-center gap-3 p-4"
                   >
-                    <div className="w-52 h-52 rounded-xl overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 bg-black/10 dark:bg-white/10 flex items-center justify-center">
+                    <div className="relative w-52 h-52 rounded-xl overflow-hidden border border-black/10 dark:border-white/10 flex-shrink-0 bg-black/10 dark:bg-white/10 flex items-center justify-center">
                       {imgUrl ? (
-                        <img src={imgUrl} alt={member.name} className="w-full h-full object-cover" />
+                        <Image src={imgUrl} alt={member.name} fill className="object-cover" />
                       ) : (
                         <User className="w-20 h-20 text-black/20 dark:text-white/20" />
                       )}

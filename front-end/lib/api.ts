@@ -40,15 +40,16 @@ export type Course = {
   credits: number;
   description: string;
   difficulty: number;
-  final_date: string;
+  final_date: string | null;
   level: number;
-  major_1_date: string;
-  major_2_date: string;
+  major_1_date: string | null;
+  major_2_date: string | null;
   objectives: string;
   prerequisites: string;
   title: string;
   syllabus?: string | null;
   industry_overview?: string | null;
+  formula_sheet?: string | null;
 };
 
 export type Event = {

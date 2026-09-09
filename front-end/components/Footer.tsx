@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 export default function Footer() {
@@ -15,11 +16,12 @@ export default function Footer() {
           {/* Brand */}
           <div className="flex flex-col gap-4 max-w-sm">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="grid items-center justify-center">
-                <img 
-                  src="/logo_white.PNG" 
-                  alt="EEC Logo" 
-                  className="h-32 md:h-48 w-auto object-contain col-start-1 row-start-1 transition-all duration-300 invert dark:invert-0" 
+              <div className="relative h-32 md:h-48 w-32 md:w-48 grid items-center justify-center">
+                <Image
+                  src="/logo_white.PNG"
+                  alt="EEC Logo"
+                  fill
+                  className="object-contain col-start-1 row-start-1 transition-all duration-300 invert dark:invert-0"
                 />
               </div>
 

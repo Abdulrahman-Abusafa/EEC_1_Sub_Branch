@@ -12,19 +12,21 @@ CREATE TABLE IF NOT EXISTS courses (
   prerequisites   TEXT,                 -- comma-separated course IDs
   objectives      TEXT,                 -- comma-separated strings
   books           TEXT,                 -- JSON: [{title, file}] — uploaded PDF filenames
-  major_1_date    DATE,
-  major_2_date    DATE,
-  final_date      DATE,
-  syllabus        TEXT,
-  industry_overview TEXT
+  major_1_date    TIMESTAMPTZ,          -- exact exam date + time
+  major_2_date    TIMESTAMPTZ,
+  final_date      TIMESTAMPTZ,
+  syllabus        TEXT,                 -- uploaded file URL (e.g. /api/files/xxx.pdf)
+  industry_overview TEXT,
+  formula_sheet   TEXT                  -- uploaded file URL (e.g. /api/files/xxx.pdf)
 );
 
 -- Add exam date columns to existing tables if not present
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_1_date DATE;
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_2_date DATE;
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS final_date DATE;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_1_date TIMESTAMPTZ;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS major_2_date TIMESTAMPTZ;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS final_date TIMESTAMPTZ;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS syllabus TEXT;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS industry_overview TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS formula_sheet TEXT;
 
 -- ─── Resources ───────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS resources (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Clock, MapPin, ArrowRight } from "lucide-react";
+import Image from "next/image";
 import { TiltCard } from "@/components/ui/3DTiltCard";
 import { motion } from "framer-motion";
 import { fetchEvents, getPhotoUrl, Event } from "@/lib/api";
@@ -72,10 +73,11 @@ function EventCard({ event, index, status }: { event: Event; index: number; stat
                     {/* Image side */}
                     <div className="w-full md:w-2/5 h-48 md:h-auto relative shrink-0 overflow-hidden bg-black/5 dark:bg-white/5 border-b md:border-b-0 md:border-r border-black/10 dark:border-white/10">
                         {imgUrl && (
-                            <img
+                            <Image
                                 src={imgUrl}
                                 alt={event.event_title}
-                                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
                             />
                         )}
 

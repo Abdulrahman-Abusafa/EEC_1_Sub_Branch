@@ -16,6 +16,32 @@ function formatFileSize(bytes: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(1)} MB`;
 }
 
+// Saudi Arabia doesn't observe DST, so a fixed UTC+3 offset is always correct.
+// Exam dates are entered/displayed in KSA wall-clock time but stored as true
+// UTC instants, so the public countdown timer is accurate for every visitor
+// regardless of their own timezone.
+const KSA_OFFSET_MINUTES = 3 * 60;
+
+/** "YYYY-MM-DDTHH:mm" (KSA local, from a <input type="datetime-local">) -> UTC ISO string, or null if empty. */
+function ksaLocalToUtcIso(localValue: string): string | null {
+  if (!localValue) return null;
+  const [datePart, timePart] = localValue.split("T");
+  if (!datePart || !timePart) return null;
+  const [y, m, d] = datePart.split("-").map(Number);
+  const [hh, mm] = timePart.split(":").map(Number);
+  const utcMs = Date.UTC(y, (m || 1) - 1, d || 1, hh || 0, mm || 0) - KSA_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcMs).toISOString();
+}
+
+/** UTC ISO string (from the API) -> "YYYY-MM-DDTHH:mm" in KSA local time, for a <input type="datetime-local">. */
+function utcIsoToKsaLocalValue(iso?: string | null): string {
+  if (!iso) return "";
+  const ksaMs = new Date(iso).getTime() + KSA_OFFSET_MINUTES * 60 * 1000;
+  const d = new Date(ksaMs);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
 function truncateFilename(name: string, maxLength = MAX_FILENAME_LENGTH): string {
   if (name.length <= maxLength) return name;
   const dotIndex = name.lastIndexOf(".");
@@ -228,6 +254,10 @@ type Course = {
   books: BookItem[];
   syllabus?: string | null;
   industry_overview?: string | null;
+  formula_sheet?: string | null;
+  major_1_date?: string | null;
+  major_2_date?: string | null;
+  final_date?: string | null;
 };
 
 export default function CoursesAdmin() {
@@ -245,8 +275,17 @@ export default function CoursesAdmin() {
   const [difficulty, setDifficulty] = useState(3.0);
   const [prereqStr, setPrereqStr] = useState("");
   const [objStr, setObjStr] = useState("");
-  const [syllabus, setSyllabus] = useState("");
   const [industryOverview, setIndustryOverview] = useState("");
+  // Syllabus & Formula Sheet are uploaded files (a URL once saved, plus a
+  // pending File when the admin picks a new/replacement one).
+  const [syllabusUrl, setSyllabusUrl] = useState("");
+  const [syllabusFile, setSyllabusFile] = useState<File | undefined>(undefined);
+  const [formulaSheetUrl, setFormulaSheetUrl] = useState("");
+  const [formulaSheetFile, setFormulaSheetFile] = useState<File | undefined>(undefined);
+  // Exam dates, entered as KSA local date+time via <input type="datetime-local">.
+  const [major1Date, setMajor1Date] = useState("");
+  const [major2Date, setMajor2Date] = useState("");
+  const [finalDate, setFinalDate] = useState("");
   const [books, setBooks] = useState<BookItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -445,7 +484,13 @@ export default function CoursesAdmin() {
     setDifficulty(3.0);
     setPrereqStr("");
     setObjStr("");
-    setSyllabus("");
+    setSyllabusUrl("");
+    setSyllabusFile(undefined);
+    setFormulaSheetUrl("");
+    setFormulaSheetFile(undefined);
+    setMajor1Date("");
+    setMajor2Date("");
+    setFinalDate("");
     setIndustryOverview("");
     setBooks([]);
     setVideos([]);
@@ -472,7 +517,13 @@ export default function CoursesAdmin() {
     setDifficulty(typeof c.difficulty === 'string' ? parseFloat(c.difficulty) : c.difficulty || 3.0);
     setPrereqStr(Array.isArray(c.prerequisites) ? c.prerequisites.join(", ") : c.prerequisites || "");
     setObjStr(Array.isArray(c.objectives) ? c.objectives.join("\n") : c.objectives || "");
-    setSyllabus(c.syllabus || "");
+    setSyllabusUrl(c.syllabus || "");
+    setSyllabusFile(undefined);
+    setFormulaSheetUrl(c.formula_sheet || "");
+    setFormulaSheetFile(undefined);
+    setMajor1Date(utcIsoToKsaLocalValue(c.major_1_date));
+    setMajor2Date(utcIsoToKsaLocalValue(c.major_2_date));
+    setFinalDate(utcIsoToKsaLocalValue(c.final_date));
     setIndustryOverview(c.industry_overview || "");
     setBooks(c.books || []);
     
@@ -492,7 +543,9 @@ export default function CoursesAdmin() {
     }
   };
 
-  const uploadBookAndGetUrl = async (file: File) => {
+  // Uploads a file and returns a URL that works from the browser (routed
+  // through the Next.js /api/files proxy), regardless of API_BASE.
+  const uploadCourseFile = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
     const res = await fetch(`${API_BASE}/upload/pdf`, {
@@ -501,7 +554,7 @@ export default function CoursesAdmin() {
     });
     if (!res.ok) throw new Error("File upload failed");
     const data = await res.json();
-    return data.url;
+    return `/api/files/${data.filename}`;
   };
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -520,16 +573,19 @@ export default function CoursesAdmin() {
         return;
       }
 
-      // 1. Upload any new PDFs first
+      // 1. Upload any new files first
       const processedBooks = (await Promise.all(
         books.map(async (b) => {
           if (b.file) {
-            const url = await uploadBookAndGetUrl(b.file);
+            const url = await uploadCourseFile(b.file);
             return { title: b.title, url };
           }
           return { title: b.title, url: b.url };
         })
       )).filter(b => b.title.trim()); // Filter out empty titles
+
+      const finalSyllabusUrl = syllabusFile ? await uploadCourseFile(syllabusFile) : syllabusUrl;
+      const finalFormulaSheetUrl = formulaSheetFile ? await uploadCourseFile(formulaSheetFile) : formulaSheetUrl;
 
       // 2. Prepare course payload
       const payload = {
@@ -542,8 +598,12 @@ export default function CoursesAdmin() {
         prerequisites: prereqStr.split(",").map(s => s.trim()).filter(Boolean),
         objectives: objStr.split("\n").map(s => s.trim()).filter(Boolean),
         books: processedBooks as Array<{ title: string; url: string }>,
-        syllabus,
-        industry_overview: industryOverview
+        syllabus: finalSyllabusUrl || null,
+        formula_sheet: finalFormulaSheetUrl || null,
+        industry_overview: industryOverview,
+        major_1_date: ksaLocalToUtcIso(major1Date),
+        major_2_date: ksaLocalToUtcIso(major2Date),
+        final_date: ksaLocalToUtcIso(finalDate),
       };
 
       const url = editingCourseId
@@ -566,7 +626,7 @@ export default function CoursesAdmin() {
             : typeof errorData === 'object'
               ? Object.values(errorData).find(v => typeof v === 'string') as string || "Server error"
               : "Server error";
-        } catch (e) {
+        } catch {
           errorMsg = res.statusText || "Server error";
         }
         console.error("Server error response:", String(errorMsg).slice(0, 200));
@@ -595,7 +655,7 @@ export default function CoursesAdmin() {
       try {
         const existingResources = await fetchCourseResources(courseId);
         await Promise.all(existingResources.map(r => deleteResource(r.id!)));
-      } catch (e) {
+      } catch {
         // If there are no resources yet, that's fine
         console.log("No existing resources to delete");
       }
@@ -1026,13 +1086,54 @@ export default function CoursesAdmin() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prerequisites (comma separated)</label>
                       <input type="text" value={prereqStr} onChange={e => setPrereqStr(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" placeholder="e.g. MATH102, PHYS102" />
                     </div>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Syllabus (file)</label>
+                        {syllabusUrl && !syllabusFile ? (
+                          <div className="w-full flex items-center justify-between gap-1.5 text-xs px-3 py-2 border border-green-500/40 bg-green-500/10 text-green-600 dark:text-green-400 rounded">
+                            <a href={syllabusUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 truncate hover:underline">
+                              <CheckCircle2 size={13} className="shrink-0" /> View current file
+                            </a>
+                            <button type="button" onClick={() => setSyllabusUrl("")} className="underline shrink-0">Replace</button>
+                          </div>
+                        ) : (
+                          <ExamFileDrop selectedFile={syllabusFile} onFile={setSyllabusFile} onReject={(msg) => pushToast('error', msg)} />
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Formula Sheet (file)</label>
+                        {formulaSheetUrl && !formulaSheetFile ? (
+                          <div className="w-full flex items-center justify-between gap-1.5 text-xs px-3 py-2 border border-green-500/40 bg-green-500/10 text-green-600 dark:text-green-400 rounded">
+                            <a href={formulaSheetUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 truncate hover:underline">
+                              <CheckCircle2 size={13} className="shrink-0" /> View current file
+                            </a>
+                            <button type="button" onClick={() => setFormulaSheetUrl("")} className="underline shrink-0">Replace</button>
+                          </div>
+                        ) : (
+                          <ExamFileDrop selectedFile={formulaSheetFile} onFile={setFormulaSheetFile} onReject={(msg) => pushToast('error', msg)} />
+                        )}
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Exam Dates &amp; Times (KSA time)</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Major 1</label>
+                          <input type="datetime-local" value={major1Date} onChange={e => setMajor1Date(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue [color-scheme:light] dark:[color-scheme:dark]" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Major 2</label>
+                          <input type="datetime-local" value={major2Date} onChange={e => setMajor2Date(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue [color-scheme:light] dark:[color-scheme:dark]" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Final</label>
+                          <input type="datetime-local" value={finalDate} onChange={e => setFinalDate(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue [color-scheme:light] dark:[color-scheme:dark]" />
+                        </div>
+                      </div>
+                    </div>
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Objectives (one per line)</label>
                       <textarea value={objStr} onChange={e => setObjStr(e.target.value)} rows={3} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" placeholder="Understand X\nAnalyze Y..."></textarea>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Syllabus</label>
-                      <textarea value={syllabus} onChange={e => setSyllabus(e.target.value)} rows={4} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-transparent dark:text-white outline-none focus:border-neon-blue" placeholder="Course syllabus / topics outline..."></textarea>
                     </div>
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Industry Overview</label>

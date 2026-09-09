@@ -1,7 +1,7 @@
 "use client";
 
 import React, { use } from "react";
-import { ArrowLeft, BookOpen, Calculator, CheckCircle2, Play, FileText, Calendar, ChevronDown, HelpCircle, Briefcase, ClipboardList } from "lucide-react";
+import { ArrowLeft, BookOpen, Calculator, CheckCircle2, Play, FileText, Calendar, ChevronDown, HelpCircle, Briefcase, ClipboardList, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -177,25 +177,6 @@ function DifficultyPeppers({ difficulty }: { difficulty: number }) {
     );
 }
 
-function InfoCard({ icon: Icon, title, value, subValues }: { icon: import("lucide-react").LucideIcon, title: string, value?: string, subValues?: string[] }) {
-    return (
-        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/10 dark:border-white/20 transition-colors">
-            <div className="flex items-center gap-3 mb-3">
-                <Icon className="w-5 h-5 text-neon-blue" />
-                <h3 className="font-bold text-white/90">{title}</h3>
-            </div>
-            {value && <p className="text-gray-600 dark:text-white/60 ml-8">{value}</p>}
-            {subValues && (
-                <div className="flex gap-2 ml-8 mt-1">
-                    {subValues.map((v, i) => (
-                        <Badge key={i} className="bg-black/10 dark:bg-white/10 text-white/90 border-transparent">{v}</Badge>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
-
 function OtherResourcesSection({ title, items, icon: Icon }: { title: string, items: { title: string, href: string }[], icon: import("lucide-react").LucideIcon }) {
     if (!items || items.length === 0) return null;
     return (
@@ -218,28 +199,6 @@ function OtherResourcesSection({ title, items, icon: Icon }: { title: string, it
                     >
                         <span className="w-1.5 h-1.5 rounded-full bg-neon-blue/50 group-hover:bg-neon-blue flex-shrink-0 transition-colors" />
                         <span className="truncate">{item.title}</span>
-                    </a>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function ContentSection({ title, items, icon: Icon }: { title: string, items: { title: string, href: string }[], icon: import("lucide-react").LucideIcon }) {
-    if (!items || items.length === 0) return null;
-    return (
-        <div className="p-6 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/10 dark:border-white/20 transition-colors h-full flex flex-col">
-             <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-lg bg-black/5 dark:bg-white/5">
-                     <Icon className="w-5 h-5 text-neon-blue" />
-                </div>
-                <h3 className="text-xl font-bold font-[family-name:var(--font-orbitron)] text-gray-900 dark:text-white/90">{title}</h3>
-            </div>
-            <div className="flex flex-col gap-3">
-                {items.map((item, i) => (
-                    <a key={i} href={item.href} target="_blank" rel="noreferrer" className="group p-4 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/[0.02] dark:hover:bg-white/5 border border-black/5 dark:border-white/5 hover:border-black/10 dark:border-white/10 transition-all flex items-center justify-between">
-                        <span className="text-gray-700 dark:text-white/70 group-hover:text-gray-900 dark:text-white transition-colors text-sm">{item.title}</span>
-                        <Play className="w-3 h-3 text-gray-300 dark:text-white/20 group-hover:text-neon-blue opacity-0 group-hover:opacity-100 transition-all" />
                     </a>
                 ))}
             </div>
@@ -480,21 +439,20 @@ function ExamTimer({ exams }: { exams: CourseMeta["exams"] }) {
     const [currentExam, setCurrentExam] = useState<{ title: string; date: Date } | null>(null);
 
     useEffect(() => {
-        // Validate that exams have valid dates
+        // Validate that exams have valid dates; if invalid, nothing to schedule.
         if (!exams || !exams.major1 || !exams.major2 || !exams.final) {
-            setCurrentExam(null);
             return;
         }
 
-        const timer = setInterval(() => {
+        const tick = () => {
             try {
                 const now = new Date();
-                
+
                 // Determine which exam is next
-                let next = null;
-                if (now < exams.major1) next = { title: "Major Exam 1", date: exams.major1 };
-                else if (now < exams.major2) next = { title: "Major Exam 2", date: exams.major2 };
-                else if (now < exams.final) next = { title: "Final Exam", date: exams.final };
+                let next: { title: string; date: Date } | null = null;
+                if (now < exams.major1!) next = { title: "Major Exam 1", date: exams.major1 };
+                else if (now < exams.major2!) next = { title: "Major Exam 2", date: exams.major2 };
+                else if (now < exams.final!) next = { title: "Final Exam", date: exams.final };
 
                 setCurrentExam(next);
 
@@ -513,9 +471,16 @@ function ExamTimer({ exams }: { exams: CourseMeta["exams"] }) {
                 console.error("Error in ExamTimer:", e);
                 setCurrentExam(null);
             }
-        }, 1000);
+        };
 
-        return () => clearInterval(timer);
+        // Run the first tick asynchronously to avoid synchronous setState in the effect body.
+        const bootstrap = setTimeout(tick, 0);
+        const timer = setInterval(tick, 1000);
+
+        return () => {
+            clearTimeout(bootstrap);
+            clearInterval(timer);
+        };
     }, [exams]);
 
     if (!currentExam || !timeLeft) {
@@ -649,9 +614,10 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
   const displayExams = course ? parseDates(course) : { major1: new Date(), major2: new Date(), final: new Date() };
   const displaySyllabus = course?.syllabus ?? "";
   const displayIndustryOverview = course?.industry_overview ?? "";
+  const displayFormulaSheet = course?.formula_sheet ?? "";
 
   // Alias to avoid conflict with outer local
-  const data = { id: displayId, title: displayTitle, description: displayDesc, level: displayLevel, credits: displayCredits, difficulty: displayDifficulty, objectives: displayObjectives, prerequisites: displayPrereqs, resources, exams: displayExams, syllabus: displaySyllabus, industryOverview: displayIndustryOverview };
+  const data = { id: displayId, title: displayTitle, description: displayDesc, level: displayLevel, credits: displayCredits, difficulty: displayDifficulty, objectives: displayObjectives, prerequisites: displayPrereqs, resources, exams: displayExams, syllabus: displaySyllabus, industryOverview: displayIndustryOverview, formulaSheet: displayFormulaSheet };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-deep-space pb-32">
@@ -711,27 +677,42 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
                 </div>
             </div>
 
-            {/* Syllabus & Industry Overview — side by side */}
-            {(data.syllabus || data.industryOverview) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
-                    <div className="p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10">
-                        <div className="flex items-center gap-3 mb-6">
-                            <FileText className="w-6 h-6 text-neon-blue" />
-                            <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)]">Syllabus</h2>
+            {/* Syllabus, Formula Sheet & Industry Overview */}
+            {(data.syllabus || data.formulaSheet || data.industryOverview) && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+                    {data.syllabus && (
+                        <a href={data.syllabus} target="_blank" rel="noreferrer" className="group p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-neon-blue/40 transition-colors flex flex-col">
+                            <div className="flex items-center gap-3 mb-4">
+                                <FileText className="w-6 h-6 text-neon-blue" />
+                                <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)]">Syllabus</h2>
+                            </div>
+                            <span className="mt-auto flex items-center gap-2 text-sm text-neon-blue group-hover:underline">
+                                <Download className="w-4 h-4" /> Download Syllabus
+                            </span>
+                        </a>
+                    )}
+                    {data.formulaSheet && (
+                        <a href={data.formulaSheet} target="_blank" rel="noreferrer" className="group p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-neon-blue/40 transition-colors flex flex-col">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Calculator className="w-6 h-6 text-neon-blue" />
+                                <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)]">Formula Sheet</h2>
+                            </div>
+                            <span className="mt-auto flex items-center gap-2 text-sm text-neon-blue group-hover:underline">
+                                <Download className="w-4 h-4" /> Download Formula Sheet
+                            </span>
+                        </a>
+                    )}
+                    {data.industryOverview && (
+                        <div className="p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10">
+                            <div className="flex items-center gap-3 mb-6">
+                                <Briefcase className="w-6 h-6 text-neon-blue" />
+                                <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)]">Industry Overview</h2>
+                            </div>
+                            <p className="text-gray-700 dark:text-white/70 leading-relaxed whitespace-pre-line">
+                                {data.industryOverview}
+                            </p>
                         </div>
-                        <p className="text-gray-700 dark:text-white/70 leading-relaxed whitespace-pre-line">
-                            {data.syllabus || "No syllabus available."}
-                        </p>
-                    </div>
-                    <div className="p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10">
-                        <div className="flex items-center gap-3 mb-6">
-                            <Briefcase className="w-6 h-6 text-neon-blue" />
-                            <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)]">Industry Overview</h2>
-                        </div>
-                        <p className="text-gray-700 dark:text-white/70 leading-relaxed whitespace-pre-line">
-                            {data.industryOverview || "No industry overview available."}
-                        </p>
-                    </div>
+                    )}
                 </div>
             )}
 

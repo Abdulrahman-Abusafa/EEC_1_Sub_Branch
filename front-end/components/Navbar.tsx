@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -20,10 +21,11 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="relative flex items-center h-full w-28 md:w-40 shrink-0 group">
           <div className="absolute top-1/2 -translate-y-1/2 -left-4 md:-left-8 pointer-events-none h-32 w-48 md:h-48 md:w-72">
-            <img 
-              src="/logo_white.PNG" 
-              alt="EEC Logo" 
-              className="absolute inset-0 w-full h-full object-contain transition-all duration-500 invert dark:invert-0 drop-shadow-xl" 
+            <Image
+              src="/logo_white.PNG"
+              alt="EEC Logo"
+              fill
+              className="object-contain transition-all duration-500 invert dark:invert-0 drop-shadow-xl"
             />
           </div>
         </Link>

@@ -2,6 +2,7 @@
 
 import React, { use, useEffect, useState } from "react";
 import { ArrowLeft, Linkedin, Mail, User } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { TiltCard } from "@/components/ui/3DTiltCard";
@@ -18,9 +19,9 @@ function RosterCard({ member, index }: { member: Member; index: number }) {
         >
             <TiltCard className="h-full group">
                 <div className="flex flex-col items-center text-center gap-4 py-4">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-black/10 dark:from-white/10 to-transparent border border-black/10 dark:border-white/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-500 shadow-[0_0_20px_rgba(255,255,255,0.05)] overflow-hidden">
+                    <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-black/10 dark:from-white/10 to-transparent border border-black/10 dark:border-white/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-500 shadow-[0_0_20px_rgba(255,255,255,0.05)] overflow-hidden">
                         {imgUrl ? (
-                            <img src={imgUrl} alt={member.name} className="w-full h-full object-cover" />
+                            <Image src={imgUrl} alt={member.name} fill className="object-cover" />
                         ) : (
                             <User className="w-10 h-10 text-gray-400 dark:text-white/50 group-hover:text-neon-blue transition-colors" />
                         )}

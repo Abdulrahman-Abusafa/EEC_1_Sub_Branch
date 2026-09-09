@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Users, Calendar, BookOpen, Activity } from "lucide-react";
+import { Users, Calendar, BookOpen, Activity, type LucideIcon } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 
 export default function AdminDashboard() {
@@ -48,7 +48,7 @@ export default function AdminDashboard() {
           Dashboard Overview
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Welcome to the EEC Admin Portal. Here is a summary of the club's data.
+          Welcome to the EEC Admin Portal. Here&rsquo;s a summary of the club&rsquo;s data.
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: number | string; color: string }) {
+function StatCard({ icon: Icon, label, value, color }: { icon: LucideIcon; label: string; value: number | string; color: string }) {
   return (
     <div className="p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 flex flex-col items-center justify-center text-center hover:scale-105 transition-transform cursor-default">
       <div className={`w-16 h-16 rounded-full bg-gradient-to-tr ${color} flex items-center justify-center text-white mb-4 shadow-lg`}>

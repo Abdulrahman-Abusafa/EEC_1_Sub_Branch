@@ -16,7 +16,7 @@ type Event = {
   end_date: string;
   status: string;
   registration_link: string;
-  image?: any;
+  image?: string | null;
 };
 
 export default function EventsAdmin() {
