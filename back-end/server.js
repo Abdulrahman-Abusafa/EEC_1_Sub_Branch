@@ -60,6 +60,7 @@ redisClient.on("error", (err) => {
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS syllabus TEXT;
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS industry_overview TEXT;
             ALTER TABLE courses ADD COLUMN IF NOT EXISTS formula_sheet TEXT;
+            ALTER TABLE courses ADD COLUMN IF NOT EXISTS about TEXT;
             ALTER TABLE resources DROP CONSTRAINT IF EXISTS resources_category_check;
             ALTER TABLE resources ADD CONSTRAINT resources_category_check CHECK (category IN ('Lecture','Exam','Material','Quiz','Homework','Other'));
         `);
@@ -145,7 +146,7 @@ app.get("/courses", async (_req, res) => {
             `SELECT course_id AS course_name, title, description, level, credits,
               difficulty, prerequisites, objectives, books,
               major_1_date, major_2_date, final_date,
-              syllabus, industry_overview, formula_sheet
+              syllabus, industry_overview, formula_sheet, about
        FROM courses
        ORDER BY level, course_id`
         );
@@ -168,7 +169,7 @@ app.get("/courses/:courseId", async (req, res) => {
             `SELECT course_id AS course_name, title, description, level, credits,
               difficulty, prerequisites, objectives, books,
               major_1_date, major_2_date, final_date,
-              syllabus, industry_overview, formula_sheet
+              syllabus, industry_overview, formula_sheet, about
        FROM courses WHERE course_id = $1`,
             [req.params.courseId]
         );
@@ -185,7 +186,7 @@ app.get("/courses/:courseId", async (req, res) => {
 app.post("/courses", async (req, res) => {
     const { course_id, title, description, level, credits, difficulty,
         prerequisites, objectives, books, major_1_date, major_2_date, final_date,
-        syllabus, industry_overview, formula_sheet } = req.body;
+        syllabus, industry_overview, formula_sheet, about } = req.body;
     try {
         // Validate required fields
         if (!course_id || !title || level === undefined) {
@@ -212,13 +213,13 @@ app.post("/courses", async (req, res) => {
         const { rows } = await pool.query(
             `INSERT INTO courses (course_id, title, description, level, credits, difficulty,
                             prerequisites, objectives, books, major_1_date, major_2_date, final_date,
-                            syllabus, industry_overview, formula_sheet)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                            syllabus, industry_overview, formula_sheet, about)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
             [course_id, title, description, level, credits, difficulty,
                 prereqStr, objStr, JSON.stringify(books),
                 major_1_date || null, major_2_date || null, final_date || null,
-                syllabus || null, industry_overview || null, formula_sheet || null]
+                syllabus || null, industry_overview || null, formula_sheet || null, about || null]
         );
         await delCache("all_courses");
         res.status(201).json(rows[0]);
@@ -233,7 +234,7 @@ app.post("/courses", async (req, res) => {
 app.put("/courses/:courseId", async (req, res) => {
     const { title, description, level, credits, difficulty,
         prerequisites, objectives, books, major_1_date, major_2_date, final_date,
-        syllabus, industry_overview, formula_sheet } = req.body;
+        syllabus, industry_overview, formula_sheet, about } = req.body;
     try {
         if (!title || level === undefined) {
             return res.status(400).json({ error: "title and level are required" });
@@ -246,12 +247,12 @@ app.put("/courses/:courseId", async (req, res) => {
             `UPDATE courses SET title=$1, description=$2, level=$3, credits=$4, difficulty=$5,
         prerequisites=$6, objectives=$7, books=$8,
         major_1_date=$9, major_2_date=$10, final_date=$11,
-        syllabus=$12, industry_overview=$13, formula_sheet=$14
-       WHERE course_id=$15 RETURNING *`,
+        syllabus=$12, industry_overview=$13, formula_sheet=$14, about=$15
+       WHERE course_id=$16 RETURNING *`,
             [title, description, level, credits, difficulty,
                 prereqStr, objStr, JSON.stringify(books),
                 major_1_date || null, major_2_date || null, final_date || null,
-                syllabus ?? null, industry_overview ?? null, formula_sheet ?? null,
+                syllabus ?? null, industry_overview ?? null, formula_sheet ?? null, about ?? null,
                 req.params.courseId]
         );
         if (!rows.length) return res.status(404).json({ error: "Course not found" });

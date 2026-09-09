@@ -1,7 +1,7 @@
 "use client";
 
 import React, { use } from "react";
-import { ArrowLeft, BookOpen, Calculator, CheckCircle2, Play, FileText, Calendar, ChevronDown, HelpCircle, Briefcase, ClipboardList, Download } from "lucide-react";
+import { ArrowLeft, BookOpen, Calculator, CheckCircle2, Play, FileText, Calendar, ChevronDown, HelpCircle, Briefcase, ClipboardList, Download, Info } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -615,9 +615,10 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
   const displaySyllabus = course?.syllabus ?? "";
   const displayIndustryOverview = course?.industry_overview ?? "";
   const displayFormulaSheet = course?.formula_sheet ?? "";
+  const displayAbout = course?.about ?? "";
 
   // Alias to avoid conflict with outer local
-  const data = { id: displayId, title: displayTitle, description: displayDesc, level: displayLevel, credits: displayCredits, difficulty: displayDifficulty, objectives: displayObjectives, prerequisites: displayPrereqs, resources, exams: displayExams, syllabus: displaySyllabus, industryOverview: displayIndustryOverview, formulaSheet: displayFormulaSheet };
+  const data = { id: displayId, title: displayTitle, description: displayDesc, level: displayLevel, credits: displayCredits, difficulty: displayDifficulty, objectives: displayObjectives, prerequisites: displayPrereqs, resources, exams: displayExams, syllabus: displaySyllabus, industryOverview: displayIndustryOverview, formulaSheet: displayFormulaSheet, about: displayAbout };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-deep-space pb-32">
@@ -677,9 +678,9 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
                 </div>
             </div>
 
-            {/* Syllabus, Formula Sheet & Industry Overview */}
-            {(data.syllabus || data.formulaSheet || data.industryOverview) && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+            {/* Syllabus, Formula Sheet, About & Industry Overview */}
+            {(data.syllabus || data.formulaSheet || data.about || data.industryOverview) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
                     {data.syllabus && (
                         <a href={data.syllabus} target="_blank" rel="noreferrer" className="group p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-neon-blue/40 transition-colors flex flex-col">
                             <div className="flex items-center gap-3 mb-4">
@@ -699,6 +700,17 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
                             </div>
                             <span className="mt-auto flex items-center gap-2 text-sm text-neon-blue group-hover:underline">
                                 <Download className="w-4 h-4" /> Download Formula Sheet
+                            </span>
+                        </a>
+                    )}
+                    {data.about && (
+                        <a href={data.about} target="_blank" rel="noreferrer" className="group p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-neon-blue/40 transition-colors flex flex-col">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Info className="w-6 h-6 text-neon-blue" />
+                                <h2 className="text-2xl font-bold font-[family-name:var(--font-orbitron)]">About</h2>
+                            </div>
+                            <span className="mt-auto flex items-center gap-2 text-sm text-neon-blue group-hover:underline">
+                                <Download className="w-4 h-4" /> Download About
                             </span>
                         </a>
                     )}

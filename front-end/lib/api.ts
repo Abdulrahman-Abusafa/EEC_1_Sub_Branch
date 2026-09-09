@@ -50,6 +50,7 @@ export type Course = {
   syllabus?: string | null;
   industry_overview?: string | null;
   formula_sheet?: string | null;
+  about?: string | null;
 };
 
 export type Event = {

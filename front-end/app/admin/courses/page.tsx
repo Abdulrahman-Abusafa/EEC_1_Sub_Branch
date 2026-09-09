@@ -255,6 +255,7 @@ type Course = {
   syllabus?: string | null;
   industry_overview?: string | null;
   formula_sheet?: string | null;
+  about?: string | null;
   major_1_date?: string | null;
   major_2_date?: string | null;
   final_date?: string | null;
@@ -282,6 +283,8 @@ export default function CoursesAdmin() {
   const [syllabusFile, setSyllabusFile] = useState<File | undefined>(undefined);
   const [formulaSheetUrl, setFormulaSheetUrl] = useState("");
   const [formulaSheetFile, setFormulaSheetFile] = useState<File | undefined>(undefined);
+  const [aboutUrl, setAboutUrl] = useState("");
+  const [aboutFile, setAboutFile] = useState<File | undefined>(undefined);
   // Exam dates, entered as KSA local date+time via <input type="datetime-local">.
   const [major1Date, setMajor1Date] = useState("");
   const [major2Date, setMajor2Date] = useState("");
@@ -521,6 +524,8 @@ export default function CoursesAdmin() {
     setSyllabusFile(undefined);
     setFormulaSheetUrl(c.formula_sheet || "");
     setFormulaSheetFile(undefined);
+    setAboutUrl(c.about || "");
+    setAboutFile(undefined);
     setMajor1Date(utcIsoToKsaLocalValue(c.major_1_date));
     setMajor2Date(utcIsoToKsaLocalValue(c.major_2_date));
     setFinalDate(utcIsoToKsaLocalValue(c.final_date));
@@ -586,6 +591,7 @@ export default function CoursesAdmin() {
 
       const finalSyllabusUrl = syllabusFile ? await uploadCourseFile(syllabusFile) : syllabusUrl;
       const finalFormulaSheetUrl = formulaSheetFile ? await uploadCourseFile(formulaSheetFile) : formulaSheetUrl;
+      const finalAboutUrl = aboutFile ? await uploadCourseFile(aboutFile) : aboutUrl;
 
       // 2. Prepare course payload
       const payload = {
@@ -600,6 +606,7 @@ export default function CoursesAdmin() {
         books: processedBooks as Array<{ title: string; url: string }>,
         syllabus: finalSyllabusUrl || null,
         formula_sheet: finalFormulaSheetUrl || null,
+        about: finalAboutUrl || null,
         industry_overview: industryOverview,
         major_1_date: ksaLocalToUtcIso(major1Date),
         major_2_date: ksaLocalToUtcIso(major2Date),
@@ -1111,6 +1118,19 @@ export default function CoursesAdmin() {
                           </div>
                         ) : (
                           <ExamFileDrop selectedFile={formulaSheetFile} onFile={setFormulaSheetFile} onReject={(msg) => pushToast('error', msg)} />
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">About (file)</label>
+                        {aboutUrl && !aboutFile ? (
+                          <div className="w-full flex items-center justify-between gap-1.5 text-xs px-3 py-2 border border-green-500/40 bg-green-500/10 text-green-600 dark:text-green-400 rounded">
+                            <a href={aboutUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 truncate hover:underline">
+                              <CheckCircle2 size={13} className="shrink-0" /> View current file
+                            </a>
+                            <button type="button" onClick={() => setAboutUrl("")} className="underline shrink-0">Replace</button>
+                          </div>
+                        ) : (
+                          <ExamFileDrop selectedFile={aboutFile} onFile={setAboutFile} onReject={(msg) => pushToast('error', msg)} />
                         )}
                       </div>
                     </div>

@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS courses (
   final_date      TIMESTAMPTZ,
   syllabus        TEXT,                 -- uploaded file URL (e.g. /api/files/xxx.pdf)
   industry_overview TEXT,
-  formula_sheet   TEXT                  -- uploaded file URL (e.g. /api/files/xxx.pdf)
+  formula_sheet   TEXT,                 -- uploaded file URL (e.g. /api/files/xxx.pdf)
+  about           TEXT                   -- uploaded file URL (e.g. /api/files/xxx.pdf)
 );
 
 -- Add exam date columns to existing tables if not present
@@ -27,6 +28,7 @@ ALTER TABLE courses ADD COLUMN IF NOT EXISTS final_date TIMESTAMPTZ;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS syllabus TEXT;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS industry_overview TEXT;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS formula_sheet TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS about TEXT;
 
 -- ─── Resources ───────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS resources (
