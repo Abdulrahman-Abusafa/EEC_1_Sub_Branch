@@ -4,8 +4,17 @@ import { useState, useEffect, useRef } from "react";
 import { Plus, Edit2, Trash2, X, Play, Calculator, BookOpen, FileText, Layers, ChevronDown, ChevronUp, HelpCircle, UploadCloud, CheckCircle2, AlertCircle, Info, ClipboardList, FolderUp, FileArchive } from "lucide-react";
 import { fetchCourseResources, createResource, deleteResource, Resource, API_BASE } from "@/lib/api";
 
-const MAX_PDF_MB = 200;
+const MAX_UPLOAD_MB = 2048; // 2 GB per file — must match back-end/server.js MAX_UPLOAD_MB
 const MAX_FILENAME_LENGTH = 32;
+
+function formatMaxSize(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB` : `${mb} MB`;
+}
+
+function formatFileSize(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(1)} MB`;
+}
 
 function truncateFilename(name: string, maxLength = MAX_FILENAME_LENGTH): string {
   if (name.length <= maxLength) return name;
@@ -23,13 +32,8 @@ function ExamFileDrop({ selectedFile, onFile, onReject }: { selectedFile?: File;
   const handleFiles = (fileList: FileList | null) => {
     const file = fileList?.[0];
     if (!file) return;
-    const looksLikePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!looksLikePdf) {
-      onReject(`"${file.name}" isn't a PDF`);
-      return;
-    }
-    if (file.size > MAX_PDF_MB * 1024 * 1024) {
-      onReject(`"${file.name}" is ${(file.size / (1024 * 1024)).toFixed(1)} MB — max is ${MAX_PDF_MB} MB`);
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      onReject(`"${file.name}" is ${formatFileSize(file.size)} — max is ${formatMaxSize(MAX_UPLOAD_MB)}`);
       return;
     }
     onFile(file);
@@ -44,13 +48,12 @@ function ExamFileDrop({ selectedFile, onFile, onReject }: { selectedFile?: File;
         <span className="flex items-center gap-1.5 truncate">
           <CheckCircle2 size={13} className="shrink-0" />
           <span className="truncate" title={selectedFile.name}>{truncateFilename(selectedFile.name)}</span>
-          <span className="text-green-600/70 dark:text-green-400/70 shrink-0">({(selectedFile.size / (1024 * 1024)).toFixed(1)} MB)</span>
+          <span className="text-green-600/70 dark:text-green-400/70 shrink-0">({formatFileSize(selectedFile.size)})</span>
         </span>
         <span className="underline shrink-0">Change</span>
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf"
           onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
           className="hidden"
         />
@@ -71,11 +74,10 @@ function ExamFileDrop({ selectedFile, onFile, onReject }: { selectedFile?: File;
       }`}
     >
       <UploadCloud size={13} className="shrink-0" />
-      <span>{dragOver ? "Drop PDF here" : "Drag PDF or click to browse"}</span>
+      <span>{dragOver ? "Drop file here" : `Drag file or click to browse (up to ${formatMaxSize(MAX_UPLOAD_MB)})`}</span>
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
         onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
         className="hidden"
       />
@@ -86,11 +88,11 @@ function ExamFileDrop({ selectedFile, onFile, onReject }: { selectedFile?: File;
 type BulkImportItem = { title: string; url: string; file: File };
 
 /**
- * Lets an admin bulk-import a batch of PDFs at once, either by selecting an
+ * Lets an admin bulk-import a batch of files at once, either by selecting an
  * entire folder (using the non-standard `webkitdirectory` file input attribute)
- * or by uploading a .zip archive (unpacked client-side with JSZip). The
- * resulting files are handed back as ready-to-upload items so callers can
- * drop them straight into a "folder"/"list" resource entry.
+ * or by uploading a .zip archive (unpacked client-side with JSZip). Any file
+ * type is accepted — the resulting files are handed back as ready-to-upload
+ * items so callers can drop them straight into a "folder"/"list" resource entry.
  */
 function BulkImportButtons({
   onImport,
@@ -104,26 +106,28 @@ function BulkImportButtons({
   const [busy, setBusy] = useState(false);
 
   // Ignores macOS junk files that tag along in folders/zips: AppleDouble
-  // sidecars ("._Foo.pdf"), .DS_Store, the __MACOSX metadata folder, and
-  // other dotfiles.
+  // sidecars ("._Foo"), .DS_Store, the __MACOSX metadata folder, and other
+  // dotfiles — these are never real course resources.
   const isJunkFile = (name: string) => {
     const base = name.split("/").pop() || name;
     return base.startsWith("._") || base === ".DS_Store" || base.startsWith(".") || name.includes("__MACOSX/");
   };
-  const looksLikePdf = (name: string) => name.toLowerCase().endsWith(".pdf") && !isJunkFile(name);
-  const stripExt = (name: string) => name.replace(/\.pdf$/i, "");
-  const maxBytes = MAX_PDF_MB * 1024 * 1024;
+  const stripExt = (name: string) => {
+    const dot = name.lastIndexOf(".");
+    return dot > 0 ? name.slice(0, dot) : name;
+  };
+  const maxBytes = MAX_UPLOAD_MB * 1024 * 1024;
 
   const handleFolderChange = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     const all = Array.from(fileList);
-    const pdfs = all.filter((f) => looksLikePdf(f.name));
-    const valid = pdfs.filter((f) => f.size <= maxBytes);
+    const usable = all.filter((f) => !isJunkFile(f.name));
+    const valid = usable.filter((f) => f.size <= maxBytes);
     if (valid.length === 0) {
       onError(
-        pdfs.length === 0
-          ? "No PDF files found in the selected folder"
-          : `All PDFs in that folder are over the ${MAX_PDF_MB} MB limit`
+        usable.length === 0
+          ? "No usable files found in the selected folder"
+          : `All files in that folder are over the ${formatMaxSize(MAX_UPLOAD_MB)} limit`
       );
       return;
     }
@@ -132,7 +136,7 @@ function BulkImportButtons({
     const name = first.webkitRelativePath ? first.webkitRelativePath.split("/")[0] : "Imported Folder";
     onImport(name, items);
     const skipped = all.length - valid.length;
-    if (skipped > 0) onError(`Imported ${valid.length} PDF(s) — skipped ${skipped} file(s) (not a PDF or over ${MAX_PDF_MB} MB)`);
+    if (skipped > 0) onError(`Imported ${valid.length} file(s) — skipped ${skipped} file(s) (system file or over ${formatMaxSize(MAX_UPLOAD_MB)})`);
   };
 
   const handleZipChange = async (fileList: FileList | null) => {
@@ -142,29 +146,28 @@ function BulkImportButtons({
     try {
       const JSZip = (await import("jszip")).default;
       const zip = await JSZip.loadAsync(zipFile);
-      const allEntries = Object.values(zip.files).filter((f) => !f.dir);
-      const pdfEntries = allEntries.filter((f) => looksLikePdf(f.name));
-      if (pdfEntries.length === 0) {
-        onError("No PDF files found in the ZIP");
+      const entries = Object.values(zip.files).filter((f) => !f.dir && !isJunkFile(f.name));
+      if (entries.length === 0) {
+        onError("No usable files found in the ZIP");
         return;
       }
       const items: BulkImportItem[] = [];
       let skipped = 0;
-      for (const entry of pdfEntries) {
+      for (const entry of entries) {
         const blob = await entry.async("blob");
         if (blob.size > maxBytes) {
           skipped++;
           continue;
         }
         const name = entry.name.split("/").pop() || entry.name;
-        items.push({ title: stripExt(name), url: "", file: new File([blob], name, { type: "application/pdf" }) });
+        items.push({ title: stripExt(name), url: "", file: new File([blob], name) });
       }
       if (items.length === 0) {
-        onError(`All PDFs in that ZIP are over the ${MAX_PDF_MB} MB limit`);
+        onError(`All files in that ZIP are over the ${formatMaxSize(MAX_UPLOAD_MB)} limit`);
         return;
       }
       onImport(zipFile.name.replace(/\.zip$/i, ""), items);
-      if (skipped > 0) onError(`Imported ${items.length} PDF(s) — skipped ${skipped} file(s) over ${MAX_PDF_MB} MB`);
+      if (skipped > 0) onError(`Imported ${items.length} file(s) — skipped ${skipped} file(s) over ${formatMaxSize(MAX_UPLOAD_MB)}`);
     } catch {
       onError("Failed to read ZIP file — make sure it's a valid archive");
     } finally {
@@ -496,7 +499,7 @@ export default function CoursesAdmin() {
       method: "POST",
       body: formData,
     });
-    if (!res.ok) throw new Error("PDF upload failed");
+    if (!res.ok) throw new Error("File upload failed");
     const data = await res.json();
     return data.url;
   };
@@ -648,7 +651,7 @@ export default function CoursesAdmin() {
         if (entry.type === 'single') {
           let url = entry.url;
           if (entry.file) {
-            url = await doUpload(entry.file, 'Quiz PDF');
+            url = await doUpload(entry.file, 'Quiz file');
           }
           if (!url) continue;
           allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Quiz', sub_category: 'Quizzes', sort_order: order++ });
@@ -656,7 +659,7 @@ export default function CoursesAdmin() {
           for (const item of entry.items) {
             let url = item.url;
             if (item.file) {
-              url = await doUpload(item.file, 'Quiz PDF');
+              url = await doUpload(item.file, 'Quiz file');
             }
             if (!url) continue;
             allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Quiz', sub_category: 'Quizzes', unit: entry.folderName, sort_order: order++ });
@@ -669,7 +672,7 @@ export default function CoursesAdmin() {
         if (entry.type === 'single') {
           let url = entry.url;
           if (entry.file) {
-            url = await doUpload(entry.file, 'Books & Notes PDF');
+            url = await doUpload(entry.file, 'Books & Notes file');
           }
           if (!url) continue;
           allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Material', sub_category: 'Books & Notes', sort_order: order++ });
@@ -677,7 +680,7 @@ export default function CoursesAdmin() {
           for (const item of entry.items) {
             let url = item.url;
             if (item.file) {
-              url = await doUpload(item.file, 'Books & Notes PDF');
+              url = await doUpload(item.file, 'Books & Notes file');
             }
             if (!url) continue;
             allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Material', sub_category: 'Books & Notes', unit: entry.groupTitle, sort_order: order++ });
@@ -690,7 +693,7 @@ export default function CoursesAdmin() {
         if (entry.type === 'single') {
           let url = entry.url;
           if (entry.file) {
-            url = await doUpload(entry.file, 'Homework PDF');
+            url = await doUpload(entry.file, 'Homework file');
           }
           if (!url) continue;
           allResources.push({ course_id: courseId, resource_title: entry.title, url, category: 'Homework', sub_category: 'Homeworks', sort_order: order++ });
@@ -698,7 +701,7 @@ export default function CoursesAdmin() {
           for (const item of entry.items) {
             let url = item.url;
             if (item.file) {
-              url = await doUpload(item.file, 'Homework PDF');
+              url = await doUpload(item.file, 'Homework file');
             }
             if (!url) continue;
             allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Homework', sub_category: 'Homeworks', unit: entry.folderName, sort_order: order++ });
@@ -713,7 +716,7 @@ export default function CoursesAdmin() {
           if (entry.type === 'single') {
             let url = entry.url;
             if (entry.file) {
-              url = await doUpload(entry.file, `${examLabels[key]} Exam PDF`);
+              url = await doUpload(entry.file, `${examLabels[key]} Exam file`);
             }
             if (!url) continue;
             allResources.push({ course_id: courseId, resource_title: `${examLabels[key]} Exam - ${entry.term}`, url, category: 'Exam', sub_category: examLabels[key], semester: entry.term, sort_order: order++ });
@@ -721,7 +724,7 @@ export default function CoursesAdmin() {
             for (const item of entry.items) {
               let url = item.url;
               if (item.file) {
-                url = await doUpload(item.file, `${examLabels[key]} Exam PDF`);
+                url = await doUpload(item.file, `${examLabels[key]} Exam file`);
               }
               if (!url) continue;
               allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Exam', sub_category: examLabels[key], semester: entry.folderName, sort_order: order++ });
@@ -735,7 +738,7 @@ export default function CoursesAdmin() {
         if (entry.type === 'single') {
           let url = entry.url;
           if (entry.file) {
-            url = await doUpload(entry.file, 'Chapter PDF');
+            url = await doUpload(entry.file, 'Chapter file');
           }
           if (!url) continue;
           allResources.push({ course_id: courseId, resource_title: entry.chapterName, url, category: 'Exam', sub_category: 'Chapter', chapter: entry.chapterName, sort_order: order++ });
@@ -743,7 +746,7 @@ export default function CoursesAdmin() {
           for (const item of entry.items) {
             let url = item.url;
             if (item.file) {
-              url = await doUpload(item.file, 'Chapter PDF');
+              url = await doUpload(item.file, 'Chapter file');
             }
             if (!url) continue;
             allResources.push({ course_id: courseId, resource_title: item.title, url, category: 'Exam', sub_category: 'Chapter', chapter: entry.folderName, sort_order: order++ });

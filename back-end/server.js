@@ -103,22 +103,19 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5 MB
 
-// Multer — PDFs
-const pdfStorage = multer.diskStorage({
+// Multer — course resource files (any type: PDFs, docs, slides, zips, media, ...)
+const MAX_UPLOAD_MB = 2048; // 2 GB per file
+const fileStorage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, FILES_DIR),
     filename: (_req, file, cb) => {
         const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        cb(null, unique + path.extname(file.originalname)); // keeps .pdf extension
+        cb(null, unique + path.extname(file.originalname)); // keeps original extension
     },
 });
-const uploadPdf = multer({
-    storage: pdfStorage,
-    limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
-    fileFilter: (_req, file, cb) => {
-        const looksLikePdf = file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf");
-        if (looksLikePdf) cb(null, true);
-        else cb(new Error("Only PDF files are allowed"));
-    },
+const uploadFile = multer({
+    storage: fileStorage,
+    limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 },
+    // No fileFilter — any file type is accepted; size is the only guard.
 });
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
@@ -623,21 +620,22 @@ app.get("/image", (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  PDF UPLOAD & DOWNLOAD
+//  RESOURCE FILE UPLOAD & DOWNLOAD
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
  * POST /upload/pdf
- * Body: multipart/form-data with field "file" (PDF)
- * Returns: { filename, url } — store url in courses.books
+ * Body: multipart/form-data with field "file" (any file type, up to MAX_UPLOAD_MB)
+ * Returns: { filename, url } — store url in courses.books / resources.url
+ * (Route name kept for backwards compatibility — it now accepts any file type.)
  */
 app.post("/upload/pdf", (req, res) => {
-    uploadPdf.single("file")(req, res, (err) => {
+    uploadFile.single("file")(req, res, (err) => {
         if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
-            return res.status(413).json({ error: "File is too large. Maximum size is 200 MB." });
+            return res.status(413).json({ error: `File is too large. Maximum size is ${MAX_UPLOAD_MB} MB.` });
         }
         if (err) return res.status(400).json({ error: err.message || "Upload failed" });
-        if (!req.file) return res.status(400).json({ error: "No PDF file uploaded" });
+        if (!req.file) return res.status(400).json({ error: "No file uploaded" });
         res.status(201).json({
             filename: req.file.filename,
             originalName: req.file.originalname,
@@ -648,7 +646,7 @@ app.post("/upload/pdf", (req, res) => {
 
 /**
  * GET /files/:filename
- * Serves the PDF as a downloadable attachment
+ * Serves the uploaded file as a downloadable attachment
  */
 app.get("/files/:filename", (req, res) => {
     const filePath = path.join(FILES_DIR, req.params.filename);
@@ -683,7 +681,14 @@ function tryParseJson(value) {
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`✅  EEC backend running → http://localhost:${PORT}`);
     console.log(`   DB  : ${process.env.DATABASE_URL}`);
 });
+
+// Node 18+ defaults requestTimeout to 5 minutes, which would kill large file
+// uploads/downloads over a slow connection. Disable it (and give headers a
+// generous allowance) so multi-hundred-MB transfers can complete.
+server.requestTimeout = 0;
+server.headersTimeout = 10 * 60 * 1000; // 10 min to receive headers
+server.keepAliveTimeout = 10 * 60 * 1000;
