@@ -680,7 +680,7 @@ export default function CoursePage({ params }: { params: Promise<{ courseId: str
 
             {/* Syllabus, Formula Sheet, About & Industry Overview */}
             {(data.syllabus || data.formulaSheet || data.about || data.industryOverview) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-6 mb-16">
                     {data.syllabus && (
                         <a href={data.syllabus} target="_blank" rel="noreferrer" className="group p-8 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 hover:border-neon-blue/40 transition-colors flex flex-col">
                             <div className="flex items-center gap-3 mb-4">
