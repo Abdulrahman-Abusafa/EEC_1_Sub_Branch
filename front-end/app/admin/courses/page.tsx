@@ -103,7 +103,14 @@ function BulkImportButtons({
   const zipInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
-  const looksLikePdf = (name: string) => name.toLowerCase().endsWith(".pdf");
+  // Ignores macOS junk files that tag along in folders/zips: AppleDouble
+  // sidecars ("._Foo.pdf"), .DS_Store, the __MACOSX metadata folder, and
+  // other dotfiles.
+  const isJunkFile = (name: string) => {
+    const base = name.split("/").pop() || name;
+    return base.startsWith("._") || base === ".DS_Store" || base.startsWith(".") || name.includes("__MACOSX/");
+  };
+  const looksLikePdf = (name: string) => name.toLowerCase().endsWith(".pdf") && !isJunkFile(name);
   const stripExt = (name: string) => name.replace(/\.pdf$/i, "");
   const maxBytes = MAX_PDF_MB * 1024 * 1024;
 
